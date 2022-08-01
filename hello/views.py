@@ -28,7 +28,7 @@ def leaderboard(request):
     for i in array_players:
         player = Player(i[1],i[2],i[3],i[4],i[5])
         players.append(player)
-    conn.close()
+    db_conn.close()
     return render(request, "leaderboard.html", {"t_title" : "Test", "array_players" : players})
 def db(request):
     greeting = Greeting()
