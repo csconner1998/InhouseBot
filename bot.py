@@ -102,8 +102,10 @@ async def checkWinStr(reaction,user):
     else:
         reaction.remove(user)
         return
-    players = cur.fetchone()[1:10]
-    cmd = "INSERT INTO matches(created,winner) values ('" + str(datetime.now()) + "','"+win+ "') returning matchid"
+    value  = cur.fetchone()
+    players = value[1:10]
+    activeid = value[0]
+    cmd = "INSERT INTO matches(matchid, created,winner) values ('"+activeid+"', '" + str(datetime.now()) + "','"+win+ "') returning matchid"
     cur.execute(cmd)
     matchid = cur.fetchone()[0]
     valueString = ""
@@ -130,6 +132,7 @@ async def checkWinStr(reaction,user):
     conn.commit()
     cur.close()
     reaction.message.delete()
+    leaderboard(reaction)
     
 async def checkStart(message):
     insertStr = "("
@@ -362,42 +365,38 @@ async def opgg(ctx, *args):
 
 
 
-# @bot.command(help="Used to swap members in created game. Input: {game id} {Role}")
-# @commands.has_role("Staff")
-# async def swap(ctx, *args):
-#     global gameDict, roles
-#     await ctx.message.delete()
-#     if len(args) != 2:
-#         msg = discord.Embed(
-#             description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
-#         await ctx.send(embed=msg)
-#         return
-#     pickedRole = str.lower(str.strip(args[1]))
-#     gameDict[gameNum].lastJoin = datetime.now()
-#     if pickedRole not in roles:
-#         msg = discord.Embed(
-#             description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
-#         await ctx.send(embed=msg)
-#         return
-#     gameNum = ''
-#     try:
-#         gameNum = int(args[0])
-#     except ValueError:
-#         msg = discord.Embed(
-#             description=args[0] + " isn't a number. Please send in format a !join \{game id\}\{role\}", color=discord.Color.gold())
-#         await ctx.send(embed=msg)
-#         return
-#     await clearGameDict()
-#     if gameNum not in gameDict:
-#         await makeGame(gameNum)
-#     mappingIndex = {"top": 0, "jungle": 1, "mid": 2, "adc": 3, "support": 4}
-#     temp = gameDict[gameNum].teamB[mappingIndex[pickedRole]]
-#     gameDict[gameNum].teamB[mappingIndex[pickedRole]
-#                             ] = gameDict[gameNum].teamR[mappingIndex[pickedRole]]
-#     gameDict[gameNum].teamR[mappingIndex[pickedRole]] = temp
-#     await lastGame(ctx, gameNum)
+@bot.command(help="Used to swap members in created game. Input: {game id} {Role}")
+@commands.has_role("Staff")
+async def swap(ctx, *args):
+    global roles
+    await ctx.message.delete()
+    if len(args) != 2:
+        msg = discord.Embed(
+            description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return
+    pickedRole = str.lower(str.strip(args[1]))
+    if pickedRole not in roles:
+        msg = discord.Embed(
+            description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return
+    gameNum = ''
+    try:
+        gameNum = int(args[0])
+    except ValueError:
+        msg = discord.Embed(
+            description=args[0] + " isn't a number. Please send in format a !join \{game id\}\{role\}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return
+    cur = conn.cursor()
+    cmd = "Update active_matches set "+pickedRole+"1 = "+pickedRole+"2, "+pickedRole+"2 = "+pickedRole+"1 where active_id = " + str(gameNum)
+    print(cmd)
+    cur.execute(cmd)
+    conn.commit()
+    cur.close()
+    await printMatch(ctx, str(gameNum))
 
-@bot.command()
 async def leaderboard(ctx):
     global leaderboardMsgs
     if leaderboardChannel == "" and ctx == "" and not (ctx != "" and ctx.author.id != 197473689263013898):
@@ -446,7 +445,7 @@ async def leaderboard(ctx):
         if leaderboardChannel != "":
             sentMsg = await leaderboardChannel.send(embed=message)
         elif ctx != "":
-            sentMsg = await ctx.send(embed=message)
+            sentMsg = await ctx.channel.send(embed=message)
         leaderboardMsgs.append(sentMsg)
 
 @bot.command(help='Used to display match history. Limit 10.')
@@ -481,14 +480,36 @@ async def matchhistory(ctx):
     msg = discord.Embed(description=totalStr, color=discord.Color.gold())
     await ctx.send(embed=msg)
 
-@bot.command(help='Just says hi...')
-async def startGame(ctx, id):
-    redString = "```diff\nRed Team```"
-    blueString = "**Game "+ str(id) +"**```md\nBlue Team```"
+@bot.command(help='Lists active matches ')
+async def activeMatches(ctx):
+    await ctx.message.delete()
     cur = conn.cursor()
-    cmd = "SELECT top1, top2, jungle1,jungle2,mid1,mid2,adc1,adc2,support1,support2 FROM active_matches WHERE active_id ='" + str(id) + "'"
+    cmd = "SELECT active_id FROM active_matches;"
+    cur.execute(cmd)
+    matchIDs = cur.fetchall()
+    for matchid in matchIDs:
+        await printMatch(ctx,matchid[0])
+
+async def printMatch(ctx, matchID):
+    try:
+        gameNum = int(matchID)
+    except ValueError:
+        msg = discord.Embed(
+            description=matchID + " isn't a number. Please send in format a !printMatch {game id}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return    
+    redString = ""
+    blueString = ""
+    cur = conn.cursor()
+    cmd = "SELECT top1, top2, jungle1,jungle2,mid1,mid2,adc1,adc2,support1,support2 FROM active_matches WHERE active_id ='" + str(matchID) + "'"
     cur.execute(cmd)
     mappingIndex = {0:"top", 1:"jungle", 2:"mid", 3:"adc", 4:"support"}
+    exists = bool(cur.rowcount)
+    if not exists:
+        msg = discord.Embed(
+            description=matchID + " isn't an active match. Use !activeMatches to get game IDs", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return  
     value = cur.fetchone()
     iter = 0
     teamR = []
@@ -496,7 +517,7 @@ async def startGame(ctx, id):
     for i in value:
         cmd = "SELECT name FROM players WHERE id ='" + str(i) + "'"
         cur.execute(cmd)
-        value2 = cur.fetchone()
+        value2 = cur.fetchone() 
         if iter % 2 == 0:
             blueString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
             teamB.append((i,value2[0]))
@@ -504,13 +525,19 @@ async def startGame(ctx, id):
             redString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
             teamR.append((i,value2[0]))
         iter += 1
-    blueEmb = discord.Embed(description=blueString, color=discord.Color.blue())
-    redEmb = discord.Embed(description=redString, color=discord.Color.red())
+    msg = discord.Embed(description = "```Game "+ str(matchID) +"```",color=discord.Color.gold())
+    msg.add_field(name="Blue Team", value=blueString, inline=True)
+    msg.add_field(name="Red Team", value=redString, inline=True)
+    await ctx.channel.send(embed=msg)
+    cur.close()
+    # await ctx.channel.send(embed=redEmb)
+
+async def startGame(ctx, id):
+    await printMatch(ctx,id)
+    cur = conn.cursor()
     whoWon = discord.Embed(description="Who Won?", color=discord.Color.gold())
-    await ctx.channel.send(embed=blueEmb)
-    await ctx.channel.send(embed=redEmb)
     wonStr = await ctx.channel.send(embed=whoWon)
-    cmd = "UPDATE active_matches SET win_msg_id = '" + str(wonStr.id) + "' where active_id ='" + str(id) + "'"
+    cmd = "UPDATE active_matches SET win_msg_id = '" + str(wonStr.id) + "' where active_id = '" + str(id) + "'"
     cur.execute(cmd)
     conn.commit()
     cur.close()
