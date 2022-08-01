@@ -3,6 +3,7 @@ from django.http import HttpResponse
 import os
 import psycopg2
 from .models import Greeting
+from .models import Player
 
 # Create your views here.
 def index(request):
@@ -16,6 +17,7 @@ def leaderboard(request):
     password=os.environ.get('DB_PASS')
     db_conn = psycopg2.connect(host=host, dbname=database, user=user, password=password)
     db_cursor = db_conn.cursor()
+    players = []
     cmd = "Select * from players;"
     db_cursor.execute(cmd)
     try:
@@ -23,8 +25,11 @@ def leaderboard(request):
     except psycopg2.Error as e:
         t_error_message = "Database error: " + e + "/n SQL: " + cmd
         return render(request, "error_report.html", {"t_error_message" : t_error_message})
-    print(array_players)
-    return render(request, "leaderboard.html", {"t_title" : "Test", "array_players" : array_players})
+    for i in array_players:
+        player = Player(i[1],i[2],i[3],i[4],i[5])
+        players.append(player)
+
+    return render(request, "leaderboard.html", {"t_title" : "Test", "array_players" : players})
 def db(request):
     greeting = Greeting()
     greeting.save()
