@@ -10,13 +10,13 @@
 <h1>{{t_title}}</h1>
 <!-- div to contain form -->
 <div class='div_outer'>
-{%
-for player in array_players:
-%}
-  <div class='div_inner'>Players: {{ player[1] }}</div>
-{%
-endfor
-%}
+    <ul>
+
+        {% for player in array_players %}
+            <li>{{ player.name }}</li>
+        {% endfor %}
+        
+        </ul>
 </div>
 <!-- Close the body of the HTML document -->
 </body>
