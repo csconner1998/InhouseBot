@@ -22,7 +22,8 @@ def leaderboard(request):
         array_players = db_cursor.fetchall()
     except psycopg2.Error as e:
         t_error_message = "Database error: " + e + "/n SQL: " + cmd
-        return render("error_report.html", t_error_message = t_error_message)
+        return render(request, "error_report.html", {"t_error_message" : t_error_message})
+    print(array_players)
     return render(request, "leaderboard.html", {"t_title" : "Test", "array_players" : array_players})
 def db(request):
     greeting = Greeting()
