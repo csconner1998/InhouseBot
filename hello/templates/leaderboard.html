@@ -1,0 +1,23 @@
+<!-- results.html -->
+<html>
+    <head>
+        <link rel="shortcut icon" href="favicon.ico">
+        <title>Test Python Template</title>
+    </head>
+<body>
+<!-- The text msg you see below as t_title is why we call this a template -->
+<!-- t_title is filled in by Python as it calls up this HTML -->
+<h1>{{t_title}}</h1>
+<!-- div to contain form -->
+<div class='div_outer'>
+{%
+for player in array_players:
+%}
+  <div class='div_inner'>Players: {{ player }}</div>
+{%
+endfor
+%}
+</div>
+<!-- Close the body of the HTML document -->
+</body>
+</html>
