@@ -130,8 +130,8 @@ async def checkWinStr(reaction,user):
     cur.execute(cmd)
     conn.commit()
     cur.close()
-    reaction.message.delete()
-    leaderboard(reaction.message.channel)
+    await reaction.message.delete()
+    await leaderboard(reaction.message.channel)
     
 async def checkStart(message):
     insertStr = "("
