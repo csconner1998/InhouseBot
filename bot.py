@@ -40,7 +40,7 @@ msgID = ""
 def makePlayer(name, id):
     #if player exists, skip
     cur = conn.cursor()
-    cmd = "SELECT * FROM players WHERE id ='" + str(id) + "'"
+    cmd = "SELECT * FROM players WHERE id ='" + str(id) + "';"
     cur.execute(cmd)
     exists = bool(cur.rowcount)
     if exists:
@@ -59,6 +59,7 @@ def updateName(name, id):
     cmd = "UPDATE players SET name = '" + name + "' where id ='" + str(id) + "'"
     cur.execute(cmd)
     conn.commit()
+    cur.close()
     #else make player
 
 def writePlayer(WinLoss, playerID):
@@ -362,6 +363,7 @@ async def opgg(ctx, *args):
     msg.add_field(name="Soulrush Points", value=SPstr, inline=True)
     msg.add_field(name="W/L", value=Ratstr, inline=True)
     await ctx.send(embed=msg)
+    cur.close()
 
 
 
@@ -445,6 +447,7 @@ async def leaderboard(ctx):
         elif ctx != "":
             sentMsg = await ctx.send(embed=message)
         leaderboardMsgs.append(sentMsg)
+    cur.close()
 
 @bot.command(help='Used to display match history. Limit 10.')
 async def matchhistory(ctx):
@@ -477,6 +480,7 @@ async def matchhistory(ctx):
     totalStr += gameIDstr + "\n" + blueString + "\n" + redString + "\n\n"
     msg = discord.Embed(description=totalStr, color=discord.Color.gold())
     await ctx.send(embed=msg)
+    cur.close()
 
 @bot.command(help='Lists active matches ')
 async def activeMatches(ctx):
