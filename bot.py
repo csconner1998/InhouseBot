@@ -81,6 +81,7 @@ def writePlayer(WinLoss, playerID):
     cur = conn.cursor()
     # Join new_data with file_data inside emp_details'
     cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', spNum = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"', where id ='" + str(playerID) + "';"
+    cur.execute(cmd)
     conn.commit()
     cur.close
     # Sets file's current position at offset.
