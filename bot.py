@@ -80,7 +80,7 @@ def writePlayer(WinLoss, playerID):
     ratioStr = int(100 * (winNum / (winNum + losNum)))
     cur = conn.cursor()
     # Join new_data with file_data inside emp_details'
-    cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', spNum = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"' where id ='" + str(playerID) + "';"
+    cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', sp = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"' where id ='" + str(playerID) + "';"
     cur.execute(cmd)
     conn.commit()
     cur.close
