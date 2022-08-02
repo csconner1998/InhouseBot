@@ -11,7 +11,6 @@ import math
 import os
 
 import psycopg2 
-print('Connecting to the PostgreSQL database...')
 conn = psycopg2.connect(
     host=os.environ.get('DB_HOST'),
     database=os.environ.get('DB_NAME'),
@@ -41,7 +40,7 @@ msgID = ""
 def makePlayer(name, id):
     #if player exists, skip
     cur = conn.cursor()
-    cmd = "SELECT * FROM players WHERE id ='" + str(id) + "'"
+    cmd = "SELECT * FROM players WHERE id ='" + str(id) + "';"
     cur.execute(cmd)
     exists = bool(cur.rowcount)
     if exists:
@@ -60,6 +59,7 @@ def updateName(name, id):
     cmd = "UPDATE players SET name = '" + name + "' where id ='" + str(id) + "'"
     cur.execute(cmd)
     conn.commit()
+    cur.close()
     #else make player
 
 def writePlayer(WinLoss, playerID):
@@ -81,7 +81,8 @@ def writePlayer(WinLoss, playerID):
     ratioStr = int(100 * (winNum / (winNum + losNum)))
     cur = conn.cursor()
     # Join new_data with file_data inside emp_details'
-    cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', spNum = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"', where id ='" + str(playerID) + "';"
+    cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', sp = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"' where id ='" + str(playerID) + "';"
+    cur.execute(cmd)
     conn.commit()
     cur.close
     # Sets file's current position at offset.
@@ -103,9 +104,9 @@ async def checkWinStr(reaction,user):
         reaction.remove(user)
         return
     value  = cur.fetchone()
-    players = value[1:10]
+    players = value[1:11]
     activeid = value[0]
-    cmd = "INSERT INTO matches(matchid, created,winner) values ('"+activeid+"', '" + str(datetime.now()) + "','"+win+ "') returning matchid"
+    cmd = "INSERT INTO matches(matchid, created,winner) values ('"+str(activeid)+"', '" + str(datetime.now()) + "','"+str(win)+ "') returning matchid"
     cur.execute(cmd)
     matchid = cur.fetchone()[0]
     valueString = ""
@@ -126,15 +127,23 @@ async def checkWinStr(reaction,user):
         valueString += "('" + str(matchid) + "', '" + str(players[i]) + "', '" + isBlue+ "', '" + str(role) + "'),"
     valueString = valueString[:len(valueString) -1]
     cmd = "INSERT INTO matches_players(match_id,player_id,blue,role) values "+valueString
+    print(cmd)
     cur.execute(cmd)
     cmd = "delete from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
     cur.execute(cmd)
     conn.commit()
     cur.close()
-    reaction.message.delete()
-    leaderboard(reaction)
+    await reaction.message.delete()
+    await leaderboard(reaction.message.channel)
     
 async def checkStart(message):
+    cur = conn.cursor()
+    cmd = "select active_id from active_matches where react_msg_id = '"+message.id+"'"
+    cur.execute(cmd)
+    exists = bool(cur.rowcount)
+    if exists:
+        cur.close()
+        return  
     insertStr = "("
     for i in message.reactions:
         if i.emoji.id == 1003021609239588875:
@@ -177,8 +186,7 @@ async def checkStart(message):
                     pass
                 else:
                     insertStr += "'" +  str(user.id) + "',"
-    insertStr = insertStr[:len(insertStr) - 1] + ")"
-    cur = conn.cursor()
+    insertStr += message.id + ")"
     randomInt = random.randint(0, 1)
     if randomInt == 1:
         topStr= "top1, top2,"
@@ -204,7 +212,7 @@ async def checkStart(message):
         supportStr= " support1, support2"
     else:
         supportStr=" support2, support1"
-    cmd = "INSERT INTO active_matches("+topStr+jungleStr+midStr+adcStr+supportStr+") values " + insertStr + " returning active_id"
+    cmd = "INSERT INTO active_matches("+topStr+jungleStr+midStr+adcStr+supportStr+",react_msg_id) values " + insertStr + " returning active_id"
     cur.execute(cmd)
     value = cur.fetchone()
     conn.commit()
@@ -270,7 +278,7 @@ async def on_reaction_add(reaction, user):
     makePlayer(nameOrNick, user.id)
     startID = await checkStart(reaction.message)
     if startID != "":
-        await startGame(reaction.channel,id)
+        await startGame(reaction.message.channel,startID)
 
     
     
@@ -293,7 +301,7 @@ async def start(ctx):
 @bot.command(help='Just says hi...')
 async def test(ctx):
     # print(args)
-    await ctx.channel.send("test")
+    await ctx.send("test")
     await ctx.send("Hi!")
     # await ctx.message.delete()
 
@@ -362,6 +370,7 @@ async def opgg(ctx, *args):
     msg.add_field(name="Soulrush Points", value=SPstr, inline=True)
     msg.add_field(name="W/L", value=Ratstr, inline=True)
     await ctx.send(embed=msg)
+    cur.close()
 
 
 
@@ -372,13 +381,13 @@ async def swap(ctx, *args):
     await ctx.message.delete()
     if len(args) != 2:
         msg = discord.Embed(
-            description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
+            description="Please send in format a !swap \{game id\} {role\}", color=discord.Color.gold())
         await ctx.send(embed=msg)
         return
     pickedRole = str.lower(str.strip(args[1]))
     if pickedRole not in roles:
         msg = discord.Embed(
-            description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
+            description="Please send in format a !swap \{game id\} \{role\}", color=discord.Color.gold())
         await ctx.send(embed=msg)
         return
     gameNum = ''
@@ -401,8 +410,6 @@ async def leaderboard(ctx):
     global leaderboardMsgs
     if leaderboardChannel == "" and ctx == "" and not (ctx != "" and ctx.author.id != 197473689263013898):
         return
-    if ctx:
-        await ctx.message.delete()
     cur = conn.cursor()
     cmd = "select * from players order by SP DESC, win DESC"
     cur.execute(cmd)
@@ -445,8 +452,9 @@ async def leaderboard(ctx):
         if leaderboardChannel != "":
             sentMsg = await leaderboardChannel.send(embed=message)
         elif ctx != "":
-            sentMsg = await ctx.channel.send(embed=message)
+            sentMsg = await ctx.send(embed=message)
         leaderboardMsgs.append(sentMsg)
+    cur.close()
 
 @bot.command(help='Used to display match history. Limit 10.')
 async def matchhistory(ctx):
@@ -479,6 +487,7 @@ async def matchhistory(ctx):
     totalStr += gameIDstr + "\n" + blueString + "\n" + redString + "\n\n"
     msg = discord.Embed(description=totalStr, color=discord.Color.gold())
     await ctx.send(embed=msg)
+    cur.close()
 
 @bot.command(help='Lists active matches ')
 async def activeMatches(ctx):
@@ -488,7 +497,7 @@ async def activeMatches(ctx):
     cur.execute(cmd)
     matchIDs = cur.fetchall()
     for matchid in matchIDs:
-        await printMatch(ctx,matchid[0])
+        await printMatch(ctx,str(matchid[0]))
 
 async def printMatch(ctx, matchID):
     try:
@@ -528,7 +537,7 @@ async def printMatch(ctx, matchID):
     msg = discord.Embed(description = "```Game "+ str(matchID) +"```",color=discord.Color.gold())
     msg.add_field(name="Blue Team", value=blueString, inline=True)
     msg.add_field(name="Red Team", value=redString, inline=True)
-    await ctx.channel.send(embed=msg)
+    await ctx.send(embed=msg)
     cur.close()
     # await ctx.channel.send(embed=redEmb)
 
@@ -536,7 +545,7 @@ async def startGame(ctx, id):
     await printMatch(ctx,id)
     cur = conn.cursor()
     whoWon = discord.Embed(description="Who Won?", color=discord.Color.gold())
-    wonStr = await ctx.channel.send(embed=whoWon)
+    wonStr = await ctx.send(embed=whoWon)
     cmd = "UPDATE active_matches SET win_msg_id = '" + str(wonStr.id) + "' where active_id = '" + str(id) + "'"
     cur.execute(cmd)
     conn.commit()
