@@ -137,6 +137,13 @@ async def checkWinStr(reaction,user):
     await leaderboard(reaction.message.channel)
     
 async def checkStart(message):
+    cur = conn.cursor()
+    cmd = "select active_id from active_matches where react_msg_id = '"+message.id+"'"
+    cur.execute(cmd)
+    exists = bool(cur.rowcount)
+    if exists:
+        cur.close()
+        return  
     insertStr = "("
     for i in message.reactions:
         if i.emoji.id == 1003021609239588875:
@@ -179,8 +186,7 @@ async def checkStart(message):
                     pass
                 else:
                     insertStr += "'" +  str(user.id) + "',"
-    insertStr = insertStr[:len(insertStr) - 1] + ")"
-    cur = conn.cursor()
+    insertStr += message.id + ")"
     randomInt = random.randint(0, 1)
     if randomInt == 1:
         topStr= "top1, top2,"
@@ -206,7 +212,7 @@ async def checkStart(message):
         supportStr= " support1, support2"
     else:
         supportStr=" support2, support1"
-    cmd = "INSERT INTO active_matches("+topStr+jungleStr+midStr+adcStr+supportStr+") values " + insertStr + " returning active_id"
+    cmd = "INSERT INTO active_matches("+topStr+jungleStr+midStr+adcStr+supportStr+",react_msg_id) values " + insertStr + " returning active_id"
     cur.execute(cmd)
     value = cur.fetchone()
     conn.commit()
@@ -375,13 +381,13 @@ async def swap(ctx, *args):
     await ctx.message.delete()
     if len(args) != 2:
         msg = discord.Embed(
-            description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
+            description="Please send in format a !swap \{game id\} {role\}", color=discord.Color.gold())
         await ctx.send(embed=msg)
         return
     pickedRole = str.lower(str.strip(args[1]))
     if pickedRole not in roles:
         msg = discord.Embed(
-            description="Please send in format a !swap \{game id\}{role\}", color=discord.Color.gold())
+            description="Please send in format a !swap \{game id\} \{role\}", color=discord.Color.gold())
         await ctx.send(embed=msg)
         return
     gameNum = ''
