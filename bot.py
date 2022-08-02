@@ -138,7 +138,7 @@ async def checkWinStr(reaction,user):
     
 async def checkStart(message):
     cur = conn.cursor()
-    cmd = "select active_id from active_matches where react_msg_id = '"+message.id+"'"
+    cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
     cur.execute(cmd)
     exists = bool(cur.rowcount)
     if exists:
@@ -186,7 +186,7 @@ async def checkStart(message):
                     pass
                 else:
                     insertStr += "'" +  str(user.id) + "',"
-    insertStr += message.id + ")"
+    insertStr += str(message.id) + ")"
     randomInt = random.randint(0, 1)
     if randomInt == 1:
         topStr= "top1, top2,"
