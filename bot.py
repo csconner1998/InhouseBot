@@ -104,7 +104,7 @@ async def checkWinStr(reaction,user):
         reaction.remove(user)
         return
     value  = cur.fetchone()
-    players = value[1:10]
+    players = value[1:11]
     activeid = value[0]
     cmd = "INSERT INTO matches(matchid, created,winner) values ('"+str(activeid)+"', '" + str(datetime.now()) + "','"+str(win)+ "') returning matchid"
     cur.execute(cmd)
@@ -127,6 +127,7 @@ async def checkWinStr(reaction,user):
         valueString += "('" + str(matchid) + "', '" + str(players[i]) + "', '" + isBlue+ "', '" + str(role) + "'),"
     valueString = valueString[:len(valueString) -1]
     cmd = "INSERT INTO matches_players(match_id,player_id,blue,role) values "+valueString
+    print(cmd)
     cur.execute(cmd)
     cmd = "delete from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
     cur.execute(cmd)
