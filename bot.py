@@ -10,12 +10,11 @@ import re
 import math
 import os
 
-import psycopg2 
-conn = psycopg2.connect(
-    host=os.environ.get('DB_HOST'),
-    database=os.environ.get('DB_NAME'),
-    user=os.environ.get('DB_USER'),
-    password=os.environ.get('DB_PASS'))
+import psycopg2
+
+from lib.db_util import DatabaseHandler 
+db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
+
 # Change only the no_category default string
 help_command = commands.DefaultHelpCommand(
     no_category = 'Commands',
@@ -37,59 +36,10 @@ msgID = ""
 
 
 
-def makePlayer(name, id):
-    #if player exists, skip
-    cur = conn.cursor()
-    cmd = "SELECT * FROM players WHERE id ='" + str(id) + "';"
-    cur.execute(cmd)
-    exists = bool(cur.rowcount)
-    if exists:
-        # cmd = "UPDATE players SET name = '" + name + "' where id ='" + str(id) + "'"
-        # cur.execute(cmd)
-        # conn.commit()
-        return
-    #else make player
-    else:
-        cmd = "INSERT INTO players(id, name, win, loss, ratio, sp) VALUES ('" + str(id) + "', '" + name + "', '0', '0', '0', '500')"
-        cur.execute(cmd)
-        conn.commit()
-def updateName(name, id):
-    #if player exists, skip
-    cur = conn.cursor()
-    cmd = "UPDATE players SET name = '" + name + "' where id ='" + str(id) + "'"
-    cur.execute(cmd)
-    conn.commit()
-    cur.close()
-    #else make player
 
-def writePlayer(WinLoss, playerID):
-    cur = conn.cursor()
-    cmd = "SELECT win, loss,sp FROM players WHERE id ='" + str(playerID) + "'"
-    cur.execute(cmd)
-    value = cur.fetchone()
-    winNum = int(value[0])
-    losNum = int(value[1])
-    spNum = int(value[2])
-    if str.lower(WinLoss) == "w":
-        winNum += 1
-        spNum += 15
-    else:
-        losNum += 1
-        spNum -= 12
-        if spNum < 0:
-            spNum = 0
-    ratioStr = int(100 * (winNum / (winNum + losNum)))
-    cur = conn.cursor()
-    # Join new_data with file_data inside emp_details'
-    cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', sp = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"' where id ='" + str(playerID) + "';"
-    cur.execute(cmd)
-    conn.commit()
-    cur.close
-    # Sets file's current position at offset.
-    # convert back to json.
 
 async def checkWinStr(reaction,user):
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "Select * from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
     cur.execute(cmd)
     exists = bool(cur.rowcount)
@@ -114,15 +64,15 @@ async def checkWinStr(reaction,user):
         if i % 2 == 0:
             isBlue = "True"
             if win == "blue":
-                writePlayer("w",players[i])
+                db_handler.writePlayer("w",players[i])
             else:
-                writePlayer("l",players[i])
+                db_handler.writePlayer("l",players[i])
         else:
             isBlue = "False"
             if win == "red":
-                writePlayer("w",players[i])
+                db_handler.writePlayer("w",players[i])
             else:
-                writePlayer("l",players[i])
+                db_handler.writePlayer("l",players[i])
         role = int(math.floor(i/2))
         valueString += "('" + str(matchid) + "', '" + str(players[i]) + "', '" + isBlue+ "', '" + str(role) + "'),"
     valueString = valueString[:len(valueString) -1]
@@ -131,13 +81,12 @@ async def checkWinStr(reaction,user):
     cur.execute(cmd)
     cmd = "delete from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
     cur.execute(cmd)
-    conn.commit()
-    cur.close()
+    db_handler.completeTransaction(cur)
     await reaction.message.delete()
     await leaderboard(reaction.message.channel)
     
 async def checkStart(message):
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
     cur.execute(cmd)
     exists = bool(cur.rowcount)
@@ -215,8 +164,7 @@ async def checkStart(message):
     cmd = "INSERT INTO active_matches("+topStr+jungleStr+midStr+adcStr+supportStr+",react_msg_id) values " + insertStr + " returning active_id"
     cur.execute(cmd)
     value = cur.fetchone()
-    conn.commit()
-    cur.close()
+    db_handler.completeTransaction(cur)
     return value[0]
     
 
@@ -275,7 +223,7 @@ async def on_reaction_add(reaction, user):
         await reaction.remove(user)
         return
     nameOrNick = user.nick if user.nick else user.name
-    makePlayer(nameOrNick, user.id)
+    db_handler.makePlayer(nameOrNick, user.id)
     startID = await checkStart(reaction.message)
     if startID != "":
         await startGame(reaction.message.channel,startID)
@@ -352,8 +300,8 @@ async def opgg(ctx, *args):
             description=args[0] + " is a valid @. Please send in format !add \{@name\} \{role\}", color=discord.Color.gold())
         await ctx.send(embed=msg)
         return
-    makePlayer(player.name,playerID)
-    cur = conn.cursor()
+    db_handler.makePlayer(player.name,playerID)
+    cur = db_handler.getCursor()
     cmd = "SELECT name, win, loss, ratio, sp FROM players WHERE id ='" + str(playerID) + "'"
     cur.execute(cmd)
     value = cur.fetchone()
@@ -370,7 +318,7 @@ async def opgg(ctx, *args):
     msg.add_field(name="Soulrush Points", value=SPstr, inline=True)
     msg.add_field(name="W/L", value=Ratstr, inline=True)
     await ctx.send(embed=msg)
-    cur.close()
+    db_handler.completeTransaction(cur)
 
 
 
@@ -398,19 +346,18 @@ async def swap(ctx, *args):
             description=args[0] + " isn't a number. Please send in format a !join \{game id\}\{role\}", color=discord.Color.gold())
         await ctx.send(embed=msg)
         return
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "Update active_matches set "+pickedRole+"1 = "+pickedRole+"2, "+pickedRole+"2 = "+pickedRole+"1 where active_id = " + str(gameNum)
     print(cmd)
     cur.execute(cmd)
-    conn.commit()
-    cur.close()
+    db_handler.completeTransaction(cur)
     await printMatch(ctx, str(gameNum))
 
 async def leaderboard(ctx):
     global leaderboardMsgs
     if leaderboardChannel == "" and ctx == "" and not (ctx != "" and ctx.author.id != 197473689263013898):
         return
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "select * from players order by SP DESC, win DESC"
     cur.execute(cmd)
     players = cur.fetchall()
@@ -459,7 +406,7 @@ async def leaderboard(ctx):
 @bot.command(help='Used to display match history. Limit 10.')
 async def matchhistory(ctx):
     await ctx.message.delete()
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit 100;"
     cur.execute(cmd)
     retList = cur.fetchall()
@@ -492,7 +439,7 @@ async def matchhistory(ctx):
 @bot.command(help='Lists active matches ')
 async def activeMatches(ctx):
     await ctx.message.delete()
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "SELECT active_id FROM active_matches;"
     cur.execute(cmd)
     matchIDs = cur.fetchall()
@@ -509,7 +456,7 @@ async def printMatch(ctx, matchID):
         return    
     redString = ""
     blueString = ""
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     cmd = "SELECT top1, top2, jungle1,jungle2,mid1,mid2,adc1,adc2,support1,support2 FROM active_matches WHERE active_id ='" + str(matchID) + "'"
     cur.execute(cmd)
     mappingIndex = {0:"top", 1:"jungle", 2:"mid", 3:"adc", 4:"support"}
@@ -543,13 +490,12 @@ async def printMatch(ctx, matchID):
 
 async def startGame(ctx, id):
     await printMatch(ctx,id)
-    cur = conn.cursor()
+    cur = db_handler.getCursor()
     whoWon = discord.Embed(description="Who Won?", color=discord.Color.gold())
     wonStr = await ctx.send(embed=whoWon)
     cmd = "UPDATE active_matches SET win_msg_id = '" + str(wonStr.id) + "' where active_id = '" + str(id) + "'"
     cur.execute(cmd)
-    conn.commit()
-    cur.close()
+    db_handler.completeTransaction(cur)
     await wonStr.add_reaction("🟦")
     await wonStr.add_reaction("🟥")
 
