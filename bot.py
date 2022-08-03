@@ -11,10 +11,10 @@ import math
 import os
 import psycopg2
 
-from lib.db_util import DatabaseHandler 
-from lib.constants import *
-from lib.command_handlers import match
-from lib.command_handlers import leaderboard
+from inhouse.db_util import DatabaseHandler 
+from inhouse.constants import *
+from inhouse.command_handlers import match
+from inhouse.command_handlers import leaderboard
 
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
 
