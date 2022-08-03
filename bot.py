@@ -1,3 +1,4 @@
+from email import message
 from optparse import Values
 import discord
 import random
@@ -84,6 +85,8 @@ async def checkWinStr(reaction,user):
     await leaderboard.updateLeaderboard(reaction.message.channel, leaderboardMsgs=leaderboardMsgs, leaderboardChannel=leaderboardChannel, db_handler=db_handler)
     
 async def checkStart(message):
+    if len(message.reactions < 12):
+        return
     cur = db_handler.getCursor()
     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
     cur.execute(cmd)
