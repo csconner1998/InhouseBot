@@ -75,7 +75,7 @@ async def updateLeaderboard(ctx, leaderboardMsgs, leaderboardChannel, db_handler
             msg.add_field(name="W/L", value=Ratstr, inline=True)
             msgList.append(msg)
         index += 1
-    if index % 15 != 9:
+    if index % 10 != 9:
         msg.add_field(name="Summoner", value=nameStr, inline=True)
         msg.add_field(name="Soulrush Points", value=SPstr, inline=True)
         msg.add_field(name="W/L", value=Ratstr, inline=True)
