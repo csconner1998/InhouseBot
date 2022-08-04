@@ -85,7 +85,7 @@ async def checkWinStr(reaction,user):
     await leaderboard.updateLeaderboard(reaction.message.channel, leaderboardMsgs=leaderboardMsgs, leaderboardChannel=leaderboardChannel, db_handler=db_handler)
     
 async def checkStart(message):
-    if len(message.reactions)< 12:
+    if len(message.reactions) < 12:
         return
     cur = db_handler.getCursor()
     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
@@ -166,8 +166,10 @@ async def checkStart(message):
     cur.execute(cmd)
     value = cur.fetchone()
     db_handler.completeTransaction(cur)
-    return value[0]
-    
+    if value[0] != None:
+        return value[0]
+    else:
+        return ""    
 @bot.event
 async def on_reaction_remove(reaction, user):
         if reaction.message not in msgList:
