@@ -1,6 +1,89 @@
+from array import array
+from dis import disco
+from mimetypes import init
+import random
 import discord
 import math
 from inhouse.constants import *
+from inhouse.db_util import DatabaseHandler
+
+class ActiveMatch(object):
+    """
+    Represents a currently active match, holding representations for:
+    - match ID in DB
+    - teams (by discord ID)
+    - The match thread
+    - a DB handler
+    """
+    # players is dict like { top: [sum1, sum2], jg: [jg1, jg2]... etc}
+    async def __init__(self, players: dict, message: discord.Message, db_handler: DatabaseHandler) -> None:
+        # TODO: match ID
+        self.match_id = 0
+        self.db_handler = db_handler
+        teams = self.choose_teams(players)
+        self.blue_team = teams['blue']
+        self.red_team = teams['red']
+
+        # auto archive in 2 hours
+        self.thread: discord.Thread = await message.create_thread(f"Game <TODOD GAME NUMBER HERE>", 120)
+    
+    def choose_teams(all_players: dict) -> dict:
+        blue_team = {}
+        red_team = {}
+        for role, players in all_players.items():
+            # shuffle and pop (not really that necessary for 2 element list but sue me)
+            shuffled_players = random.sample(players, len(players))
+            blue_team[role] = shuffled_players.pop()
+            red_team[role] = shuffled_players.pop()
+        return {'blue': blue_team, 'red': red_team}
+
+    async def printMatch(self, ctx, db_handler):
+        try:
+            gameNum = self.match_id
+        except ValueError:
+            msg = discord.Embed(
+                description=self.match_id + " isn't a number. Please send in format a !printMatch {game id}", color=discord.Color.gold())
+            await ctx.send(embed=msg)
+            return    
+        redString = ""
+        blueString = ""
+        cur = db_handler.getCursor()
+        cmd = "SELECT top1, top2, jungle1,jungle2,mid1,mid2,adc1,adc2,support1,support2 FROM active_matches WHERE active_id ='" + str(self.match_id) + "'"
+        cur.execute(cmd)
+        mappingIndex = {0:"top", 1:"jungle", 2:"mid", 3:"adc", 4:"support"}
+        exists = bool(cur.rowcount)
+        if not exists:
+            msg = discord.Embed(
+                description=self.match_id + " isn't an active match. Use !activeMatches to get game IDs", color=discord.Color.gold())
+            await ctx.send(embed=msg)
+            return  
+        value = cur.fetchone()
+        iter = 0
+        teamR = []
+        teamB = []
+        for i in value:
+            cmd = "SELECT name FROM players WHERE id ='" + str(i) + "'"
+            cur.execute(cmd)
+            value2 = cur.fetchone() 
+            if iter % 2 == 0:
+                blueString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
+                teamB.append((i,value2[0]))
+            else:
+                redString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
+                teamR.append((i,value2[0]))
+            iter += 1
+        msg = discord.Embed(description = "```Game "+ str(self.match_id) +"```",color=discord.Color.gold())
+        msg.add_field(name="Blue Team", value=blueString, inline=True)
+        msg.add_field(name="Red Team", value=redString, inline=True)
+        await ctx.send(embed=msg)
+        cur.close()
+        # await ctx.channel.send(embed=redEmb)
+
+    def print_match_debug(self):
+        print(f"""ID: {self.id}
+        Blue Team: {self.blue_team}
+        Red Team: {self.red_team}
+        Thread ID: {self.thread.id}""")
 
 """
 Holds all utility functions related to match operations
@@ -79,47 +162,7 @@ async def swapPlayers(ctx, args, db_handler):
     db_handler.completeTransaction(cur)
     await printMatch(ctx, str(gameNum), db_handler=db_handler)
 
-async def printMatch(ctx, matchID, db_handler):
-    try:
-        gameNum = int(matchID)
-    except ValueError:
-        msg = discord.Embed(
-            description=matchID + " isn't a number. Please send in format a !printMatch {game id}", color=discord.Color.gold())
-        await ctx.send(embed=msg)
-        return    
-    redString = ""
-    blueString = ""
-    cur = db_handler.getCursor()
-    cmd = "SELECT top1, top2, jungle1,jungle2,mid1,mid2,adc1,adc2,support1,support2 FROM active_matches WHERE active_id ='" + str(matchID) + "'"
-    cur.execute(cmd)
-    mappingIndex = {0:"top", 1:"jungle", 2:"mid", 3:"adc", 4:"support"}
-    exists = bool(cur.rowcount)
-    if not exists:
-        msg = discord.Embed(
-            description=matchID + " isn't an active match. Use !activeMatches to get game IDs", color=discord.Color.gold())
-        await ctx.send(embed=msg)
-        return  
-    value = cur.fetchone()
-    iter = 0
-    teamR = []
-    teamB = []
-    for i in value:
-        cmd = "SELECT name FROM players WHERE id ='" + str(i) + "'"
-        cur.execute(cmd)
-        value2 = cur.fetchone() 
-        if iter % 2 == 0:
-            blueString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
-            teamB.append((i,value2[0]))
-        else:
-            redString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
-            teamR.append((i,value2[0]))
-        iter += 1
-    msg = discord.Embed(description = "```Game "+ str(matchID) +"```",color=discord.Color.gold())
-    msg.add_field(name="Blue Team", value=blueString, inline=True)
-    msg.add_field(name="Red Team", value=redString, inline=True)
-    await ctx.send(embed=msg)
-    cur.close()
-    # await ctx.channel.send(embed=redEmb)
+
 
 async def listActiveMatches(ctx, db_handler):
     await ctx.message.delete()
