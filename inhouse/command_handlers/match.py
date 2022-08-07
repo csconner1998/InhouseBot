@@ -6,6 +6,7 @@ import discord
 import math
 from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
+import datetime
 
 class ActiveMatch(object):
     """
@@ -15,19 +16,38 @@ class ActiveMatch(object):
     - The match thread
     - a DB handler
     """
-    # players is dict like { top: [sum1, sum2], jg: [jg1, jg2]... etc}
-    async def __init__(self, players: dict, message: discord.Message, db_handler: DatabaseHandler) -> None:
-        # TODO: match ID
-        self.match_id = 0
+    def __init__(self, db_handler: DatabaseHandler) -> None:
+        print("creating new active match...")
+        self.match_id = None
         self.db_handler = db_handler
+        self.thread: discord.Thread = None
+        self.blue_team: dict = None
+        self.red_team: dict = None
+
+    # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
+    async def begin(self, players: dict, ctx) -> discord.Message:
+        """
+        Begins this match, setting up the thread, sending all info messages, and doing database operations
+        """
+        print("beginning match...")
+        # Choose teams
+        print(f"attempting start with players {players}")
         teams = self.choose_teams(players)
         self.blue_team = teams['blue']
         self.red_team = teams['red']
+        self.player_ids = [player.id for role_list in players.values() for player in role_list]
 
-        # auto archive in 2 hours
-        self.thread: discord.Thread = await message.create_thread(f"Game <TODOD GAME NUMBER HERE>", 120)
-    
-    def choose_teams(all_players: dict) -> dict:
+        # DB Operations
+        self.create_active_db_entry()
+
+        # create thread
+        return await self.create_match_thread(ctx)
+
+    def choose_teams(self, all_players: dict) -> dict:
+        """
+        Helper to choose teams for this match randomly
+        """
+        print("choosing teams...")
         blue_team = {}
         red_team = {}
         for role, players in all_players.items():
@@ -37,53 +57,104 @@ class ActiveMatch(object):
             red_team[role] = shuffled_players.pop()
         return {'blue': blue_team, 'red': red_team}
 
-    async def printMatch(self, ctx, db_handler):
-        try:
-            gameNum = self.match_id
-        except ValueError:
-            msg = discord.Embed(
-                description=self.match_id + " isn't a number. Please send in format a !printMatch {game id}", color=discord.Color.gold())
-            await ctx.send(embed=msg)
-            return    
-        redString = ""
-        blueString = ""
-        cur = db_handler.getCursor()
-        cmd = "SELECT top1, top2, jungle1,jungle2,mid1,mid2,adc1,adc2,support1,support2 FROM active_matches WHERE active_id ='" + str(self.match_id) + "'"
-        cur.execute(cmd)
-        mappingIndex = {0:"top", 1:"jungle", 2:"mid", 3:"adc", 4:"support"}
-        exists = bool(cur.rowcount)
-        if not exists:
-            msg = discord.Embed(
-                description=self.match_id + " isn't an active match. Use !activeMatches to get game IDs", color=discord.Color.gold())
-            await ctx.send(embed=msg)
-            return  
-        value = cur.fetchone()
-        iter = 0
-        teamR = []
-        teamB = []
-        for i in value:
-            cmd = "SELECT name FROM players WHERE id ='" + str(i) + "'"
-            cur.execute(cmd)
-            value2 = cur.fetchone() 
-            if iter % 2 == 0:
-                blueString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
-                teamB.append((i,value2[0]))
-            else:
-                redString += mappingIndex[int(math.floor(iter/2))] + ": " +  value2[0] + "\n"
-                teamR.append((i,value2[0]))
-            iter += 1
+    async def create_match_thread(self, ctx: discord.context.ApplicationContext) -> discord.Message:
+        """
+        Helper to create a new discord thread for the match. Threads are set to auto-archive in 2 hours
+
+        Returns the Message object of the "report result"
+        """
+        print("creating match thread...")
+        msg = discord.Embed(description=f"Match {self.match_id} has started! Join the Thread **HERE!**", color=discord.Color.gold())
+        start_message = await ctx.send(embed=msg)
+        # auto archive in 2 hours
+        # TODO: magic number
+        self.thread: discord.Thread = await start_message.create_thread(name=f"Game {self.match_id}", auto_archive_duration=60)
+        await self.send_match_description()
+        return await self.send_match_report_result()
+
+
+    async def send_match_description(self):
+        """
+        Sends the match description including roles/players and match number to the match thread
+        """
         msg = discord.Embed(description = "```Game "+ str(self.match_id) +"```",color=discord.Color.gold())
-        msg.add_field(name="Blue Team", value=blueString, inline=True)
-        msg.add_field(name="Red Team", value=redString, inline=True)
-        await ctx.send(embed=msg)
-        cur.close()
-        # await ctx.channel.send(embed=redEmb)
+
+        blue_string = ""
+        red_string = ""
+        for role, player in self.blue_team.items():
+            blue_string += f"{role}: {player.name}\n"
+        for role, player in self.red_team.items():
+            red_string += f"{role}: {player.name}\n"
+
+        msg.add_field(name="Blue Team", value=blue_string.strip(), inline=True)
+        msg.add_field(name="Red Team", value=red_string.strip(), inline=True)
+        sent_msg = await self.thread.send(embed=msg)
+        sent_msg.pin()
+
+    # TODO: unstub
+    async def send_match_report_result(self) -> discord.Message:
+        """
+        Sends the match report "report who won" message to the match thread
+        """
+        print("stub send_match_report_result")
+        cur = self.db_handler.get_cursor()
+        who_won = discord.Embed(description="Who Won?", color=discord.Color.gold())
+        won_message = await self.thread.send(embed=who_won)
+        cmd = f"UPDATE active_matches SET win_msg_id = '{str(won_message.id)}' where active_id = '{str(self.match_id)}'"
+        cur.execute(cmd)
+        self.db_handler.complete_transaction(cur)
+        await won_message.add_reaction("🟦")
+        await won_message.add_reaction("🟥")
+        return won_message
+
+    async def complete_match(self, winner: str):
+        """
+        Completes a match with the given winner, either 'red' or 'blue'
+        """        
+        # Update players in db
+        if winner == 'blue':
+            [player.write_player_to_db('w') for player in self.blue_team.values()]
+            [player.write_player_to_db('l') for player in self.red_team.values()]
+        if winner == 'red':
+            [player.write_player_to_db('l') for player in self.blue_team.values()]
+            [player.write_player_to_db('w') for player in self.red_team.values()]
+
+        # update matches in db
+        cur = self.db_handler.get_cursor()
+        complete_match_sql = f"INSERT INTO matches(matchid, created,winner) VALUES ('{self.match_id}', '{str(datetime.now())}','{winner}') RETURNING matchid"
+        remove_active_match_sql = f"DELETE FROM active_matches WHERE win_msg_id = {self.match_id}'"
+        cur.execute(complete_match_sql)
+        cur.execute(remove_active_match_sql)
+        self.db_handler.complete_transaction(cur)
+
+            
+    def create_active_db_entry(self):
+        """
+        Helper to create an active_matches db entry for this match
+        """
+        player_ids_str = ""
+        for key in roles:
+            player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
+        
+        # strip last comma and insert
+        cmd = f"INSERT INTO active_matches({all_roles_db_key}) values ({player_ids_str.strip(',')}) returning active_id"
+
+        cur = self.db_handler.get_cursor()
+        cur.execute(cmd)
+        # update match id
+        self.match_id = cur.fetchone()[0]
+        self.db_handler.complete_transaction(cur)
 
     def print_match_debug(self):
+        """
+        Dump all match stuff for debug
+        """
         print(f"""ID: {self.id}
         Blue Team: {self.blue_team}
         Red Team: {self.red_team}
         Thread ID: {self.thread.id}""")
+
+
 
 """
 Holds all utility functions related to match operations

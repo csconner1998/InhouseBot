@@ -33,36 +33,10 @@ class DatabaseHandler:
         self.connection.commit()
         cur.close()
         #else make player
-
-    def writePlayer(self, WinLoss, playerID):
-        cur = self.connection.cursor()
-        cmd = "SELECT win, loss,sp FROM players WHERE id ='" + str(playerID) + "'"
-        cur.execute(cmd)
-        value = cur.fetchone()
-        winNum = int(value[0])
-        losNum = int(value[1])
-        spNum = int(value[2])
-        if str.lower(WinLoss) == "w":
-            winNum += 1
-            spNum += 15
-        else:
-            losNum += 1
-            spNum -= 12
-            if spNum < 0:
-                spNum = 0
-        ratioStr = int(100 * (winNum / (winNum + losNum)))
-        cur = self.connection.cursor()
-        # Join new_data with file_data inside emp_details'
-        cmd = "UPDATE players SET win = '"+str(winNum)+"', loss = '"+str(losNum)+"', sp = '"+str(spNum)+"', ratio = '"+str(ratioStr)+"' where id ='" + str(playerID) + "';"
-        cur.execute(cmd)
-        self.connection.commit()
-        cur.close
-        # Sets file's current position at offset.
-        # convert back to json.
     
-    def getCursor(self):
+    def get_cursor(self):
         return self.connection.cursor()
 
-    def completeTransaction(self, cursor):
+    def complete_transaction(self, cursor):
         self.connection.commit()
         cursor.close()
