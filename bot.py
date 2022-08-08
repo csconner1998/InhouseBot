@@ -86,14 +86,14 @@ async def checkWinStr(reaction,user):
     
 async def checkStart(message):
     if len(message.reactions) < 12:
-        return
+        return ""
     cur = db_handler.getCursor()
     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
     cur.execute(cmd)
     exists = bool(cur.rowcount)
     if exists:
         cur.close()
-        return  
+        return ""
     insertStr = "("
     for i in message.reactions:
         if i.emoji.id == top_emoji_id:
