@@ -36,7 +36,7 @@ class DatabaseHandler:
             return
         #else make match reporter
         else:
-            cmd = "INSERT INTO matches(player_id) VALUES ('" +str(id) + "')"
+            cmd = "INSERT INTO match_reporters(player_id) VALUES ('" +str(id) + "')"
             cur.execute(cmd)
             self.connection.commit()
             cur.close()

@@ -46,6 +46,10 @@ async def checkWinStr(reaction,user):
         return False
     cmd = "Select * from match_reporters where player_id = '" + str(user.id) + "'"
     cur.execute(cmd)
+    exists = bool(cur.rowcount)
+    if not exists:
+        reaction.remove(user)
+        return
     win = ""
     if reaction.emoji == "🟦":
         win = "blue"
@@ -108,6 +112,9 @@ async def addReporter(ctx, *args):
         await ctx.send(embed=msg)
         return
     db_handler.addMatchReport(playerID)
+    msg = discord.Embed(
+    description=player.name + " added", color=discord.Color.gold())
+    await ctx.send(embed=msg)
 
 async def checkStart(message):
     if len(message.reactions) < 12:
