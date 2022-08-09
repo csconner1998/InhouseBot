@@ -24,7 +24,23 @@ class DatabaseHandler:
             cmd = "INSERT INTO players(id, name, win, loss, ratio, sp) VALUES ('" + str(id) + "', '" + name + "', '0', '0', '0', '500')"
             cur.execute(cmd)
             self.connection.commit()
+            cur.close()
 
+    def addMatchReport(self,id):
+        #if match reporter exists, skip
+        cur = self.connection.cursor()
+        cmd = "SELECT * FROM match_reporters WHERE player_id ='" + str(id) + "';"
+        cur.execute(cmd)
+        exists = bool(cur.rowcount)
+        if exists:
+            return
+        #else make match reporter
+        else:
+            cmd = "INSERT INTO matches(player_id) VALUES ('" +str(id) + "')"
+            cur.execute(cmd)
+            self.connection.commit()
+            cur.close()
+        
     def updateName(self, name, id):
         #if player exists, skip
         cur = self.connection.cursor()

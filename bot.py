@@ -44,6 +44,8 @@ async def checkWinStr(reaction,user):
     exists = bool(cur.rowcount)
     if not exists:
         return False
+    cmd = "Select * from match_reporters where player_id = '" + str(user.id) + "'"
+    cur.execute(cmd)
     win = ""
     if reaction.emoji == "🟦":
         win = "blue"
@@ -83,7 +85,30 @@ async def checkWinStr(reaction,user):
     db_handler.completeTransaction(cur)
     await reaction.message.delete()
     await leaderboard.updateLeaderboard(reaction.message.channel, leaderboardMsgs=leaderboardMsgs, leaderboardChannel=leaderboardChannel, db_handler=db_handler)
-    
+
+@bot.command(help='STAFF COMMAND. Adds player to reporters')
+@commands.has_role("Staff")
+async def addReporter(ctx, *args):
+    if len(args) != 1:
+        msg = discord.Embed(
+            description="Please send in format !addReporter \{@player\}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return
+    player = args[0]
+    if not (str.startswith(player, '<@') and str.endswith(player, '>')):
+        msg = discord.Embed(
+            description="Please send in format !addReporter \{@player\}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return
+    playerID = int(re.sub("[^0-9]", "", player))
+    player = await bot.fetch_user(playerID)
+    if not player:
+        msg = discord.Embed(
+            description="Please send in format !addReporter \{@player\}", color=discord.Color.gold())
+        await ctx.send(embed=msg)
+        return
+    db_handler.addMatchReport(playerID)
+
 async def checkStart(message):
     if len(message.reactions) < 12:
         return ""
