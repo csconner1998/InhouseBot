@@ -37,6 +37,10 @@ logChannel = ""
 leaderboardChannel = ""
 msgID = ""
 
+async def isRole(user,role,message):
+    role = discord.utils.find(lambda r: r.name == role, message.guild.roles)
+    return role in user.roles
+
 async def checkWinStr(reaction,user):
     cur = db_handler.getCursor()
     cmd = "Select * from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
@@ -45,6 +49,9 @@ async def checkWinStr(reaction,user):
     if not exists:
         return False
     win = ""
+    if not isRole(user,"Match Reporter"):
+        reaction.remove(user)
+        return
     if reaction.emoji == "🟦":
         win = "blue"
     elif reaction.emoji == "🟥":
@@ -85,6 +92,9 @@ async def checkWinStr(reaction,user):
     await leaderboard.updateLeaderboard(reaction.message.channel, leaderboardMsgs=leaderboardMsgs, leaderboardChannel=leaderboardChannel, db_handler=db_handler)
     
 async def checkStart(message):
+    count = sum([reaction.count for reaction in message.reactions])
+    if count < 15:
+        return False
     cur = db_handler.getCursor()
     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
     cur.execute(cmd)
@@ -228,7 +238,6 @@ async def on_reaction_add(reaction, user):
         await startGame(reaction.message.channel,startID)
 
 # MARK: Utility commands
-
 @bot.command(help='Just says hi...')
 async def test(ctx):
     # print(args)
