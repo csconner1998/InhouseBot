@@ -230,7 +230,13 @@ async def on_reaction_add(reaction, user):
         await startGame(reaction.message.channel,startID)
 
 # MARK: Utility commands
-
+async def isRole(user,role,ctx):
+    role = discord.utils.find(lambda r: r.name == role, ctx.message.guild.roles)
+    user = ctx.author
+    if role in user.roles:
+        return True
+    else:
+        return False
 @bot.command(help='Just says hi...')
 async def test(ctx):
     # print(args)
