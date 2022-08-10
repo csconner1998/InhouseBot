@@ -39,10 +39,7 @@ msgID = ""
 
 async def isRole(user,role,message):
     role = discord.utils.find(lambda r: r.name == role, message.guild.roles)
-    if role in user.roles:
-        return True
-    else:
-        return False
+    return role in user.roles
 
 async def checkWinStr(reaction,user):
     cur = db_handler.getCursor()
@@ -95,9 +92,7 @@ async def checkWinStr(reaction,user):
     await leaderboard.updateLeaderboard(reaction.message.channel, leaderboardMsgs=leaderboardMsgs, leaderboardChannel=leaderboardChannel, db_handler=db_handler)
     
 async def checkStart(message):
-    count = 0
-    for i in message.reactions:
-        count += i.count
+    count = sum([reaction.count for reaction in message.reactions])
     if count < 15:
         return False
     cur = db_handler.getCursor()
