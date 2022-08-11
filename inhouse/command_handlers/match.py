@@ -51,7 +51,7 @@ async def getMatchHistory(ctx, db_handler):
     await ctx.send(embed=msg)
     cur.close()
 
-async def swapPlayers(ctx, *args, db_handler):
+async def swapPlayers(ctx, args, db_handler):
     await ctx.message.delete()
     if len(args) != 2:
         msg = discord.Embed(
