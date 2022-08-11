@@ -49,7 +49,7 @@ async def checkWinStr(reaction,user):
     if not exists:
         return False
     win = ""
-    if not isRole(user,"Match Reporter"):
+    if not isRole(user,"Match Reporter",message):
         reaction.remove(user)
         return
     if reaction.emoji == "🟦":
