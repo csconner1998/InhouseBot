@@ -52,7 +52,6 @@ async def getMatchHistory(ctx, db_handler):
     cur.close()
 
 async def swapPlayers(ctx, *args, db_handler):
-    global roles
     await ctx.message.delete()
     if len(args) != 2:
         msg = discord.Embed(
