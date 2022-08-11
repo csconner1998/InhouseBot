@@ -94,7 +94,7 @@ async def checkWinStr(reaction,user):
 async def checkStart(message):
     count = sum([reaction.count for reaction in message.reactions])
     if count < 15:
-        return False
+        return ""
     cur = db_handler.getCursor()
     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
     cur.execute(cmd)
