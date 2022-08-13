@@ -9,6 +9,8 @@ import re
 import os
 from inhouse.command_handlers.player import Player
 
+# TODO: logger rather than prints
+
 from inhouse.db_util import DatabaseHandler 
 from inhouse.constants import *
 from inhouse.command_handlers.queue import Queue
@@ -46,7 +48,7 @@ bot.intents.reactions = True
 bot.intents.members = True
 
 inhouse_role_id = None
-main_queue = None
+main_queue: Queue = None
 main_leaderboard = None
 
 @bot.event
@@ -70,11 +72,13 @@ async def start_queue(ctx):
     main_queue = Queue(ctx=ctx)
     await main_queue.create_queue_message(inhouse_role_id)
 
-# Clear Queue
+# Reset Queue
 @commands.has_role("Bot Dev")
 @bot.slash_command(guild_ids=[test_guild_id])
-async def clear_queue(ctx):
-    await main_queue.clear_queue()
+async def reset_queue(ctx):
+    await ctx.respond("Resetting Queue...")
+    await ctx.send("Queue has been reset, any active matches will still be tracked. React to the new message to join!")
+    await main_queue.reset_queue(inhouse_role_id)
 
 # Set Leaderboard Channel
 @commands.has_role("Bot Dev")
@@ -99,7 +103,7 @@ async def set_inhouse_role(ctx, role: str):
 
 # Swap Players
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description= "Swap players in given role for a match. Must be sent in the match thread.", guild_ids=[test_guild_id])
 async def swap_players(ctx, role: str):
     if role.lower() not in roles:
         msg = discord.Embed(
@@ -148,8 +152,6 @@ async def on_raw_reaction_add(payload):
 
     # Handle Queue reactions
     if payload.message_id == main_queue.queue_message.id:
-        print("reaction to queue")
-        print(payload)
         # if the emoji isn't one of the role ones we should remove it
         if payload.emoji.id not in all_role_emojis:
             print(f"non-role reaction id {payload.emoji} added, removing...")
@@ -157,7 +159,7 @@ async def on_raw_reaction_add(payload):
             return
         
         # Otherwise handle the addition
-        await handle_queue_reaction(user=payload.member, emoji_id=payload.emoji.id, added_reaction=True)
+        await handle_queue_reaction(user=payload.member, emoji=payload.emoji, added_reaction=True)
 
     # handle complete match reactions
     if payload.message_id in main_queue.active_matches_by_message_id.keys():
@@ -183,57 +185,59 @@ async def on_raw_reaction_remove(payload):
     print(payload)
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
-        print("reaction from bot, ignoring...")
         return
 
     # Handle Queue reaction remove
     if payload.message_id == main_queue.queue_message.id:
-        print("reaction to queue")
         # If a non-role reaction was removed, this function is a no-op
         if payload.emoji.id not in all_role_emojis:
-            print("non-role reaction removed, ignoring...")
             return
         
         # Otherwise handle the removal
-        await handle_queue_reaction(user=payload.user_id, emoji_id=payload.emoji.id, added_reaction=False)
+        await handle_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False)
 
 # NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
 # The function handles this on it's own.
-async def handle_queue_reaction(user, emoji_id, added_reaction: bool):
-    # Slightly jank condition chain
-    # stop players from reacting if they're already in a game
-    if not type(user) is int and user.id in [player_id for player_id in [match.get_all_player_ids() for match in main_queue.active_matches_by_message_id.values()]]:
-        print("player reacting is already in an active match, removing reaction and returning...")
-        await main_queue.queue_message.remove_reaction(emoji_id, member=user)
-        return
+async def handle_queue_reaction(user, emoji, added_reaction: bool):
+    if added_reaction:
+        # stop players from reacting if they're already in a game
+        # since we get a list of ids and mush em together we end up with a enested list with one elem, so just pull it out
+        match_player_ids = [match.get_all_player_ids() for match in main_queue.active_matches_by_message_id.values()]
+        if len(match_player_ids) > 0 and user.id in match_player_ids[0]:
+            await main_queue.queue_message.remove_reaction(emoji, member=user)
+            return
 
-    # TODO: limit to 1 reaction on queue message per player once done testing
+        # TODO: This works, uncomment once done testing
+        # Allow players to react to only one role.
+        # if user.id in main_queue.all_queued_player_ids():
+        #     await main_queue.queue_message.remove_reaction(emoji, member=user)
+        #     return
+
     # add player to queue
+    # how I wish for switch statements in python :(
     role = ''
+    emoji_id = emoji.id
     if emoji_id == top_emoji_id:
-        print("top player")
         role = role_top
     if emoji_id == jg_emoji_id:
-        print("jg player")
         role = role_jungle
     if emoji_id == mid_emoji_id:
-        print("mid player")
         role = role_mid
     if emoji_id == bot_emoji_id:
-        print("adc player")
         role = role_adc
     if emoji_id == supp_emoji_id:
-        print("supp player")
         role = role_support
 
     if added_reaction:
         player = Player(user.id, name=user.display_name, db_handler=db_handler)
-        print(f"adding player {player}")
         main_queue.queued_players[role].append(player)
-        await main_queue.attempt_create_match()
+        await main_queue.attempt_create_match(bot=bot)
     else:
-        player_to_remove = list(filter(lambda player: player.id == user, [player for player in main_queue.queued_players[role]]))[0]
-        print(f"removing player {player_to_remove}")
-        main_queue.queued_players[role].remove(player_to_remove)
+        found_players = list(filter(lambda player: player.id == user, [player for player in main_queue.queued_players[role]]))
+        if len(found_players) == 1:
+            # If no players match we can assume that the removed reaction was from the bot for a disallowed multi-role queue
+            player_to_remove = found_players[0]
+            main_queue.queued_players[role].remove(player_to_remove)
+
 
 bot.run(os.environ.get('Discord_Key'))

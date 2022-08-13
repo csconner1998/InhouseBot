@@ -82,9 +82,9 @@ class ActiveMatch(object):
         blue_string = ""
         red_string = ""
         for role, player in self.blue_team.items():
-            blue_string += f"{role}: {player.name}\n"
+            blue_string += f"{role}: <@{player.id}>\n"
         for role, player in self.red_team.items():
-            red_string += f"{role}: {player.name}\n"
+            red_string += f"{role}: <@{player.id}>\n"
 
         msg.add_field(name="Blue Team", value=blue_string.strip(), inline=True)
         msg.add_field(name="Red Team", value=red_string.strip(), inline=True)
@@ -198,22 +198,9 @@ class ActiveMatch(object):
         Thread ID: {self.thread.id}""")
 
 
-"""
-Holds all utility functions related to match operations
-"""
 
-async def startMatchLobby(ctx, msgList):
-    await ctx.message.delete()
-    msgStr = f"```GAME```Top: <:Top:{top_emoji_id}>\nJungle: <:jungle:{jg_emoji_id}>\nMid: <:Mid:{mid_emoji_id}>\nAdc: <:Bottom:{bot_emoji_id}>\nSupport: <:Support:{supp_emoji_id}>"
-    msg = discord.Embed(
-    description=msgStr, color=discord.Color.gold())
-    message = await ctx.send(embed=msg)
-    msgList.append(message)
-    await message.add_reaction(f"<:Top:{top_emoji_id}>")
-    await message.add_reaction(f"<:jungle:{jg_emoji_id}>")
-    await message.add_reaction(f"<:Mid:{mid_emoji_id}>")
-    await message.add_reaction(f"<:Bottom:{bot_emoji_id}>")
-    await message.add_reaction(f"<:Support:{supp_emoji_id}>")
+
+        
 
 async def getMatchHistory(ctx, db_handler):
     await ctx.message.delete()
@@ -246,42 +233,3 @@ async def getMatchHistory(ctx, db_handler):
     msg = discord.Embed(description=totalStr, color=discord.Color.gold())
     await ctx.send(embed=msg)
     cur.close()
-
-async def swapPlayers(ctx, args, db_handler):
-    await ctx.message.delete()
-    if len(args) != 2:
-        msg = discord.Embed(
-            description="Please send in format a !swap \{game id\} {role\}", color=discord.Color.gold())
-        await ctx.send(embed=msg)
-        return
-    pickedRole = str.lower(str.strip(args[1]))
-    if pickedRole not in roles:
-        msg = discord.Embed(
-            description="Please send in format a !swap \{game id\} \{role\}", color=discord.Color.gold())
-        await ctx.send(embed=msg)
-        return
-    gameNum = ''
-    try:
-        gameNum = int(args[0])
-    except ValueError:
-        msg = discord.Embed(
-            description=args[0] + " isn't a number. Please send in format a !join \{game id\}\{role\}", color=discord.Color.gold())
-        await ctx.send(embed=msg)
-        return
-    cur = db_handler.getCursor()
-    cmd = "Update active_matches set "+pickedRole+"1 = "+pickedRole+"2, "+pickedRole+"2 = "+pickedRole+"1 where active_id = " + str(gameNum)
-    print(cmd)
-    cur.execute(cmd)
-    db_handler.completeTransaction(cur)
-    await printMatch(ctx, str(gameNum), db_handler=db_handler)
-
-
-
-async def listActiveMatches(ctx, db_handler):
-    await ctx.message.delete()
-    cur = db_handler.getCursor()
-    cmd = "SELECT active_id FROM active_matches;"
-    cur.execute(cmd)
-    matchIDs = cur.fetchall()
-    for matchid in matchIDs:
-        await printMatch(ctx,str(matchid[0]), db_handler=db_handler)
