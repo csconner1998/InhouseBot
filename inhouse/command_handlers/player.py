@@ -3,6 +3,10 @@ from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
 import re
 
+# TODO: return to 15/12
+win_points = 0
+loss_points = 0
+
 class Player(object):
     """
     Represents a player, holding data for:
@@ -14,7 +18,7 @@ class Player(object):
         self.id = id
         self.db_handler = db_handler
 
-    def write_player_to_db(self, WinLoss):
+    def update_player_in_db(self, WinLoss):
         cur = self.db_handler.get_cursor()
         cmd = f"SELECT win, loss,sp FROM players WHERE id ='{str(self.id)}'"
         cur.execute(cmd)
@@ -22,16 +26,16 @@ class Player(object):
         winNum = int(value[0])
         losNum = int(value[1])
         spNum = int(value[2])
+        # TODO: return win/loss nums to 1 from 0
         if str.lower(WinLoss) == "w":
             winNum += 0
-            spNum += 0
+            spNum += win_points
         else:
             losNum += 0
-            spNum -= 0
+            spNum -= loss_points
             if spNum < 0:
                 spNum = 0
         ratioStr = int(100 * (winNum / (winNum + losNum)))
-        cur = self.connection.cursor()
         cmd = f"UPDATE players SET win = '{str(winNum)}', loss = '{str(losNum)}', sp = '{str(spNum)}', ratio = '{str(ratioStr)}' where id ='{str(self.id)}';"
         cur.execute(cmd)
         self.db_handler.complete_transaction(cur)

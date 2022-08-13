@@ -25,16 +25,19 @@ class Queue(object):
         self.queue_message = None
         self.db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
 
-    async def create_queue_message(self):
+    async def create_queue_message(self, inhouse_role):
         """
         Should be called once to create a new queue message
         """
-
         msg_str = f"```QUEUE```Top: <:Top:{top_emoji_id}>\nJungle: <:jungle:{jg_emoji_id}>\nMid: <:Mid:{mid_emoji_id}>\nAdc: <:Bottom:{bot_emoji_id}>\nSupport: <:Support:{supp_emoji_id}>"
         msg = discord.Embed(description=msg_str, color=discord.Color.gold())
         
-        # TODO: ping inhouse role
+        if inhouse_role == None:
+            await self.ctx.send(content="InHouse role is not set, ask an admin to set it.")
+        else:
+            await self.ctx.send(content=f"{inhouse_role}")
         message = await self.ctx.send(content="InHouse Queue is open!", embed=msg)
+        # can maybe asyncio.gather these but runs into some REST overlap
         await message.add_reaction(f"<:Top:{top_emoji_id}>")
         await message.add_reaction(f"<:jungle:{jg_emoji_id}>")
         await message.add_reaction(f"<:Mid:{mid_emoji_id}>")
@@ -69,16 +72,14 @@ class Queue(object):
         Handles player priority as well as reaction cleanup for players selected.
         """
         print("creating a match...")
-        # remove all those chosen players from queue
-        # TODO: there's probably a more clever way to do this but... meh
         # Remove the reactions of all players in this match from the queue
-        # TODO: stop players from reacting if they're already in a game
         for reaction in self.queue_message.reactions:
             player_reactions = await reaction.users().flatten()
             users_to_remove = [user for user in player_reactions if user.id in match_player_ids]
             for user in users_to_remove:
                 reaction.remove(user)
         # Choose players
+
         # TODO: prio system goes here
         match_players = {}
         # store the ids as just a list for pruning the reactions later

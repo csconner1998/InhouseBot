@@ -1,4 +1,6 @@
+from concurrent.futures import thread
 from optparse import Values
+import queue
 import discord
 from discord.ext import commands
 import random
@@ -39,371 +41,184 @@ help_command = commands.DefaultHelpCommand(
 description = "Hi! I am a bot to help with creating and loggin inhouses! Please use any of the following commands with a leading ! to use.\nInHouseBot by made by Conner Soule"
 test_guild_id = int(os.getenv('GUILD_ID'))
 
-# intents = discord.Intents.default()
-# intents.members = True
-# intents.reactions = True
 bot = discord.Bot(debug_guilds=[test_guild_id])
 bot.intents.reactions = True
 bot.intents.members = True
 
-
-#bot = commands.Bot(command_prefix='!')
-#bot.intents.members = True
-leaderboardMsgs = []
-msgList = []
-
-logChannel = ""
-leaderboardChannel = ""
-msgID = ""
-
+inhouse_role_id = None
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-# TODO: remove IDs from repo
+# Ping
 @bot.slash_command(guild_ids=[test_guild_id])
 async def ping(ctx):
     await ctx.respond("pong")
+# TODO: match history command
 
-# TODO change to staff
+# TODO change all Bot Dev to Staff
+# Start Queue
 @commands.has_role("Bot Dev")
 @bot.slash_command(guild_ids=[test_guild_id])
 async def start_queue(ctx):
+    # TODO: change this respond to like an image banner or smth nice
+    await ctx.respond("Creating Queue...")
     global main_queue
     main_queue = Queue(ctx=ctx)
-    await main_queue.create_queue_message()
-    await ctx.respond("Queue Started")
+    await main_queue.create_queue_message(inhouse_role_id)
 
+# Clear Queue
 @commands.has_role("Bot Dev")
 @bot.slash_command(guild_ids=[test_guild_id])
 async def clear_queue(ctx):
     await main_queue.clear_queue()
 
+# Set Leaderboard Channel
+@commands.has_role("Bot Dev")
 @bot.slash_command(guild_ids=[test_guild_id])
 async def set_leaderboard_channel(ctx, channel_name: str):
-    # TODO: error handling/messages
     channel_id = re.sub("[^0-9]", "", channel_name)
-    print(channel_id)
     channel = bot.get_channel(int(channel_id))
+    if channel == None:
+        await ctx.respond("Channel not found")
+        return
     global main_leaderboard
     main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
     await ctx.respond("Leaderboard channel updated")
 
+# Set inhouse role
+@commands.has_role("Bot Dev")
+@bot.slash_command(guild_ids=[test_guild_id])
+async def set_inhouse_role(ctx, role: str):
+    global inhouse_role_id
+    inhouse_role_id = role
+    await ctx.respond("Inhouse role updated")
+
+# Swap Players
+@commands.has_role("Bot Dev")
+@bot.slash_command(guild_ids=[test_guild_id])
+async def swap_players(ctx, role: str):
+    if role.lower() not in roles:
+        msg = discord.Embed(
+            description="Please enter a valid role: top, jungle, mid, adc, support", color=discord.Color.gold())
+        await ctx.respond(embed=msg)
+        return
+    # must be sent in the thread of the individual game
+    #main_queue.active_matches_by_message_id.values()
+    matches_to_swap = list(filter(lambda match: match.thread.id == ctx.channel_id, [match for match in main_queue.active_matches_by_message_id.values()]))
+    if len(matches_to_swap) != 1:
+        msg = discord.Embed(
+            description="No active match found in this channel. Send this command in a match thread.", color=discord.Color.gold())
+        await ctx.respond(embed=msg)
+        return
+    
+    await matches_to_swap[0].swap_players(role)
+    await ctx.respond(f"Swapped {role}")
+
+# Update player history (Add Wins or Losses)
+@commands.has_role("Bot Dev")
+@bot.slash_command(guild_ids=[test_guild_id])
+async def update_player_history(ctx, user: str, win_or_loss: str):
+    if win_or_loss.lower() not in ['w', 'l']:
+        msg = discord.Embed(
+            description="Please send update as one of 'W' or 'L'", color=discord.Color.gold())
+        await ctx.respond(embed=msg)
+        return
+    
+    # trim the tag crap off the user ID
+    user_id = re.sub("[^0-9]", "", user)
+    # name doesn't matter in this context, we just need to link the id
+    player = Player(user_id, name="", db_handler=db_handler)
+    player.update_player_in_db(win_or_loss)
+    await ctx.respond("Player updated.")
+    if main_leaderboard == None:
+        await ctx.respond("No leaderboard channel set currently")
+        return
+    await main_leaderboard.update_leaderboard()
+
 @bot.event
 async def on_raw_reaction_add(payload):
-    # ignore bot reactions
+    # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
         print("reaction from bot, ignoring...")
         return
 
-    # TODO: we can keep a list of valid things to handle so that we don't do this for every reaction in the server
     # Handle Queue reactions
     if payload.message_id == main_queue.queue_message.id:
         print("reaction to queue")
-        await handle_queue_reaction(user=payload.member, emoji_id=payload.emoji.id)
+        print(payload)
+        # if the emoji isn't one of the role ones we should remove it
+        if payload.emoji.id not in all_role_emojis:
+            print(f"non-role reaction id {payload.emoji} added, removing...")
+            await main_queue.queue_message.clear_reaction(emoji=payload.emoji)
+            return
+        
+        # Otherwise handle the addition
+        await handle_queue_reaction(user=payload.member, emoji_id=payload.emoji.id, added_reaction=True)
 
     # handle complete match reactions
-    if main_leaderboard != None:
+    if payload.message_id in main_queue.active_matches_by_message_id.keys() and main_leaderboard != None:
         await main_queue.attempt_complete_match(payload.message_id, '', main_leaderboard=main_leaderboard)
 
-async def handle_queue_reaction(user, emoji_id):
+# This handles the bot removing people's reactins from the queue as well
+# i.e. if someone attempts to queue up while already in a game this handles the bot removing that reaction gracefully
+@bot.event
+async def on_raw_reaction_remove(payload):
+    print(payload)
+    # bot reactions to any message are a no-op
+    if payload.user_id == bot.user.id:
+        print("reaction from bot, ignoring...")
+        return
+
+    # Handle Queue reaction remove
+    if payload.message_id == main_queue.queue_message.id:
+        print("reaction to queue")
+        # If a non-role reaction was removed, this function is a no-op
+        if payload.emoji.id not in all_role_emojis:
+            print("non-role reaction removed, ignoring...")
+            return
+        
+        # Otherwise handle the removal
+        await handle_queue_reaction(user=payload.user_id, emoji_id=payload.emoji.id, added_reaction=False)
+
+# NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
+# The function handles this on it's own.
+async def handle_queue_reaction(user, emoji_id, added_reaction: bool):
+    # Slightly jank condition chain
+    # stop players from reacting if they're already in a game
+    if not type(user) is int and user.id in [player_id for player_id in [match.get_all_player_ids() for match in main_queue.active_matches_by_message_id.values()]]:
+        print("player reacting is already in an active match, removing reaction and returning...")
+        await main_queue.queue_message.remove_reaction(emoji_id, member=user)
+        return
+
+    # TODO: limit to 1 reaction on queue message per player once done testing
     # add player to queue
-    player = Player(user.id, name=user.display_name, db_handler=db_handler)
+    role = ''
     if emoji_id == top_emoji_id:
         print("top player")
-        main_queue.queued_players['top'].append(player)
+        role = role_top
     if emoji_id == jg_emoji_id:
         print("jg player")
-        main_queue.queued_players['jungle'].append(player)
+        role = role_jungle
     if emoji_id == mid_emoji_id:
         print("mid player")
-        main_queue.queued_players['mid'].append(player)
+        role = role_mid
     if emoji_id == bot_emoji_id:
         print("adc player")
-        main_queue.queued_players['adc'].append(player)
+        role = role_adc
     if emoji_id == supp_emoji_id:
         print("supp player")
-        main_queue.queued_players['support'].append(player)
+        role = role_support
 
-    await main_queue.attempt_create_match()
+    if added_reaction:
+        player = Player(user.id, name=user.display_name, db_handler=db_handler)
+        print(f"adding player {player}")
+        main_queue.queued_players[role].append(player)
+        await main_queue.attempt_create_match()
+    else:
+        player_to_remove = list(filter(lambda player: player.id == user, [player for player in main_queue.queued_players[role]]))[0]
+        print(f"removing player {player_to_remove}")
+        main_queue.queued_players[role].remove(player_to_remove)
 
 bot.run(os.environ.get('Discord_Key'))
-
-# async def checkWinStr(reaction,user):
-#     cur = db_handler.get_cursor()
-#     cmd = "Select * from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
-#     cur.execute(cmd)
-#     exists = bool(cur.rowcount)
-#     if not exists:
-#         return False
-#     win = ""
-#     if reaction.emoji == "🟦":
-#         win = "blue"
-#     elif reaction.emoji == "🟥":
-#         win = "red"
-#     else:
-#         reaction.remove(user)
-#         return
-#     value  = cur.fetchone()
-#     players = value[1:11]
-#     activeid = value[0]
-#     cmd = "INSERT INTO matches(matchid, created,winner) values ('"+str(activeid)+"', '" + str(datetime.now()) + "','"+str(win)+ "') returning matchid"
-#     cur.execute(cmd)
-#     matchid = cur.fetchone()[0]
-#     valueString = ""
-#     for i in range(len(players)):
-#         if i % 2 == 0:
-#             isBlue = "True"
-#             if win == "blue":
-#                 db_handler.writePlayer("w",players[i])
-#             else:
-#                 db_handler.writePlayer("l",players[i])
-#         else:
-#             isBlue = "False"
-#             if win == "red":
-#                 db_handler.writePlayer("w",players[i])
-#             else:
-#                 db_handler.writePlayer("l",players[i])
-#         role = int(math.floor(i/2))
-#         valueString += "('" + str(matchid) + "', '" + str(players[i]) + "', '" + isBlue+ "', '" + str(role) + "'),"
-#     valueString = valueString[:len(valueString) -1]
-#     cmd = "INSERT INTO matches_players(match_id,player_id,blue,role) values "+valueString
-#     print(cmd)
-#     cur.execute(cmd)
-#     cmd = "delete from active_matches where win_msg_id = '" + str(reaction.message.id) + "'"
-#     cur.execute(cmd)
-#     db_handler.complete_transaction(cur)
-#     await reaction.message.delete()
-#     await leaderboard.updateLeaderboard(reaction.message.channel, leaderboardMsgs=leaderboardMsgs, leaderboardChannel=leaderboardChannel, db_handler=db_handler)
-    
-# async def checkStart(message):
-#     if len(message.reactions) < 12:
-#         return
-#     cur = db_handler.get_cursor()
-#     cmd = "select active_id from active_matches where react_msg_id = '"+str(message.id)+"'"
-#     cur.execute(cmd)
-#     exists = bool(cur.rowcount)
-#     if exists:
-#         cur.close()
-#         return  
-#     insertStr = "("
-#     for i in message.reactions:
-#         if i.emoji.id == top_emoji_id:
-#             if i.count != 3:
-#                 return ""
-#             async for user in i.users():
-#                 if user == bot.user:
-#                     pass
-#                 else:
-#                     insertStr += "'" + str(user.id) + "',"
-#         if i.emoji.id == jg_emoji_id:
-#             if i.count != 3:
-#                 return ""
-#             async for user in i.users():
-#                 if user == bot.user:
-#                     pass
-#                 else:
-#                     insertStr += "'" +  str(user.id) + "',"
-#         if i.emoji.id == mid_emoji_id:
-#             if i.count != 3:
-#                 return ""
-#             async for user in i.users():
-#                 if user == bot.user:
-#                     pass
-#                 else:
-#                     insertStr += "'" +  str(user.id)  + "',"
-#         if i.emoji.id == bot_emoji_id:
-#             if i.count != 3:
-#                 return ""
-#             async for user in i.users():
-#                 if user == bot.user:
-#                     pass
-#                 else:
-#                     insertStr += "'" +  str(user.id)  + "',"
-#         if i.emoji.id == supp_emoji_id:
-#             if i.count != 3:
-#                 return ""
-#             async for user in i.users():
-#                 if user == bot.user:
-#                     pass
-#                 else:
-#                     insertStr += "'" +  str(user.id) + "',"
-#     insertStr += str(message.id) + ")"
-#     randomInt = random.randint(0, 1)
-#     if randomInt == 1:
-#         topStr= "top1, top2,"
-#     else:
-#         topStr="top2, top1,"
-#     randomInt = random.randint(0, 1)
-#     if randomInt == 1:
-#         jungleStr= " jungle1, jungle2,"
-#     else:
-#         jungleStr=" jungle2, jungle1,"
-#     randomInt = random.randint(0, 1)
-#     if randomInt == 1:
-#         midStr= " mid1, mid2,"
-#     else:
-#         midStr=" mid2, mid1,"
-#     randomInt = random.randint(0, 1)
-#     if randomInt == 1:
-#         adcStr= " adc1, adc2,"
-#     else:
-#         adcStr=" adc2, adc1,"
-#     randomInt = random.randint(0, 1)
-#     if randomInt == 1:
-#         supportStr= " support1, support2"
-#     else:
-#         supportStr=" support2, support1"
-#     cmd = f"INSERT INTO active_matches({topStr+jungleStr+midStr+adcStr+supportStr},react_msg_id) values {insertStr} returning active_id"
-#     cur.execute(cmd)
-#     value = cur.fetchone()
-#     db_handler.complete_transaction(cur)
-#     if value[0] != None:
-#         return value[0]
-#     else:
-#         return ""    
-# @bot.event
-# async def on_reaction_remove(reaction, user):
-#         if reaction.message not in msgList:
-#             return
-#         if user == bot.user:
-#             return
-#         # await changeMessage(reaction.message,user)
-
-# @bot.event
-# async def on_reaction_add(reaction, user):
-#     global msgList
-#     if user == bot.user:
-#         return 
-#     if reaction.message not in msgList:
-#         if await checkWinStr(reaction, user):
-#             return
-#         else:
-#             return
-#     for reaction2 in reaction.message.reactions:
-#         async for recuser in reaction2.users():
-#             if recuser == user and reaction2 != reaction:
-#                 await reaction.remove(user)
-#                 return
-#     if reaction.count < 2:
-#         return
-#     if reaction.emoji.id == top_emoji_id:
-#         number = reaction.count - 1
-#         if number > 2:
-#             await reaction.remove(user)
-#             return
-#     elif reaction.emoji.id == jg_emoji_id:
-#         number = reaction.count - 1
-#         if number > 2:
-#             await reaction.remove(user)
-#             return
-#     elif reaction.emoji.id == mid_emoji_id:
-#         number = reaction.count - 1
-#         if number > 2:
-#             await reaction.remove(user)
-#             return
-#     elif reaction.emoji.id == bot_emoji_id:
-#         number = reaction.count - 1
-#         if number > 2:
-#             await reaction.remove(user)
-#             return
-#     elif reaction.emoji.id == supp_emoji_id:
-#         number = reaction.count - 1
-#         if number > 2:
-#             await reaction.remove(user)
-#             return
-#     else:
-#         await reaction.remove(user)
-#         return
-#     nameOrNick = user.nick if user.nick else user.name
-#     db_handler.makePlayer(nameOrNick, user.id)
-#     startID = await checkStart(reaction.message)
-#     if startID != "":
-#         await startGame(reaction.message.channel,startID)
-
-# MARK: Utility commands
-
-#@bot.command(help='Just says hi...')
-# @bot.command()
-# async def test(ctx):
-#     print("in tests")
-#     # print(args)
-#     await ctx.send("test")
-#     await ctx.send("Hi!")
-    # await ctx.message.delete()
-
-# @bot.command(help='STAFF ONLY COMMAND. Used to set leaderboard and logging channel. Input: {leaderboard or log} {#channel}')
-# @commands.has_role("Staff")
-# async def setChannel(ctx, *args):
-#     await ctx.message.delete()
-#     global logChannel, leaderboardChannel
-#     if len(args) != 2 or (args[0] != "log" and args[0] != "leaderboard"):
-#         msg = discord.Embed(
-#             description="Please send in format !setChannel \{'leaderboard or log'\} \{'#channel'\}", color=discord.Color.gold())
-#         await ctx.send(embed=msg)
-#         return
-#     channelID = re.sub("[^0-9]", "", args[1])
-#     if channelID == "":
-#         msg = discord.Embed(
-#             description="Please send in format !setChannel \{'leaderboard or log'\} \{'#channel'\}", color=discord.Color.gold())
-#         await ctx.send(embed=msg)
-#         return
-#     channel = bot.get_channel(int(channelID))
-#     if args[0] == "log":
-#         await channel.send("Now logging here")
-#         logChannel = channel
-#     elif args[0] == "leaderboard":
-#         leaderboardChannel = channel
-#         await ctx.send(args[1] + " is now the leaderboard channel")
-
-# MARK: WIP queue Commands
-
-
-
-# @bot.command(help="set leaderboard channel")
-# async def setLeaderboardChannel(ctx, *args):
-#     # TODO: error handling/messages
-#     await ctx.message.delete()
-#     channel_id = re.sub("[^0-9]", "", args[1])
-#     channel = bot.get_channel(int(channel_id))
-#     global main_leaderboard
-#     main_leaderboard = leaderboard.Leaderboard(db_handler=db_handler, channel=channel)
-# # MARK: Leaderboard commands
-
-# @bot.command(help='Used to check your SP and W/L ratio. Input {@user}')
-# async def soulrushStanding(ctx, *args):
-#     await leaderboard.getLeaderboardStanding(bot, ctx, args, db_handler)
-
-# MARK: Match commands
-
-# @bot.command(help='Starts a match lobby')
-# async def start(ctx):
-#     await match.startMatchLobby(ctx, msgList=msgList)
-
-# @bot.command(help="Used to swap members in created game. Input: {game id} {Role}")
-# @commands.has_role("Staff")
-# async def swap(ctx, *args):
-#     await match.swapPlayers(ctx, args, db_handler=db_handler)
-
-# @bot.command(help='Used to display match history. Limit 10.')
-# async def matchhistory(ctx):
-#     match.getMatchHistory(ctx, db_handler=db_handler)
-
-# @bot.command(help='Lists active matches.')
-# async def activeMatches(ctx):
-#     match.listActiveMatches(ctx, db_handler=db_handler)
-
-# async def startGame(ctx, id):
-#     await match.printMatch(ctx,id,db_handler=db_handler)
-#     cur = db_handler.get_cursor()
-#     whoWon = discord.Embed(description="Who Won?", color=discord.Color.gold())
-#     wonStr = await ctx.send(embed=whoWon)
-#     cmd = "UPDATE active_matches SET win_msg_id = '" + str(wonStr.id) + "' where active_id = '" + str(id) + "'"
-#     cur.execute(cmd)
-#     db_handler.complete_transaction(cur)
-#     await wonStr.add_reaction("🟦")
-#     await wonStr.add_reaction("🟥")
-
-# print("trying to run...")
-# bot.run(os.environ.get('Discord_Key'))

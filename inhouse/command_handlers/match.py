@@ -4,6 +4,7 @@ from mimetypes import init
 import random
 import discord
 import math
+from .player import Player
 from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
 import datetime
@@ -23,6 +24,7 @@ class ActiveMatch(object):
         self.thread: discord.Thread = None
         self.blue_team: dict = None
         self.red_team: dict = None
+        self.match_description_message: discord.Message = None
 
     # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
     async def begin(self, players: dict, ctx) -> discord.Message:
@@ -66,12 +68,10 @@ class ActiveMatch(object):
         print("creating match thread...")
         msg = discord.Embed(description=f"Match {self.match_id} has started! Join the Thread **HERE!**", color=discord.Color.gold())
         start_message = await ctx.send(embed=msg)
-        # auto archive in 2 hours
-        # TODO: magic number
+        # auto archive in 1 hour of inactivity
         self.thread: discord.Thread = await start_message.create_thread(name=f"Game {self.match_id}", auto_archive_duration=60)
         await self.send_match_description()
         return await self.send_match_report_result()
-
 
     async def send_match_description(self):
         """
@@ -89,9 +89,12 @@ class ActiveMatch(object):
         msg.add_field(name="Blue Team", value=blue_string.strip(), inline=True)
         msg.add_field(name="Red Team", value=red_string.strip(), inline=True)
         sent_msg = await self.thread.send(embed=msg)
-        sent_msg.pin()
+        # unpin old (if applicable) and pin new
+        if self.match_description_message != None:
+            await self.match_description_message.unpin()
+        await sent_msg.pin()
+        self.match_description_message = sent_msg
 
-    # TODO: unstub
     async def send_match_report_result(self) -> discord.Message:
         """
         Sends the match report "report who won" message to the match thread
@@ -126,12 +129,31 @@ class ActiveMatch(object):
         cur.execute(complete_match_sql)
         cur.execute(remove_active_match_sql)
         self.db_handler.complete_transaction(cur)
+    
+    async def swap_players(self, role: str):
+        print(f"swapping players for {role}")
+        # Update model
+        temp = self.blue_team[role]
+        self.blue_team[role] = self.red_team[role]
+        self.red_team[role] = temp
 
+        # Update DB
+        cur = self.db_handler.getCursor()
+        # does this work without a temp var? SQL smort.
+        cmd = f"UPDATE active_matches SET {role}1 = {role}2, {role}2 = {role}1 WHERE active_id = {str(self.match_id)}"
+        print(cmd)
+        cur.execute(cmd)
+        self.db_handler.completeTransaction(cur)
+        await self.send_match_description()
             
     def create_active_db_entry(self):
         """
         Helper to create an active_matches db entry for this match
         """
+        # TODO: insert new players if necessary
+        all_player_ids = self.get_all_player_ids()
+        
+
         player_ids_str = ""
         for key in roles:
             player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
@@ -144,6 +166,9 @@ class ActiveMatch(object):
         # update match id
         self.match_id = cur.fetchone()[0]
         self.db_handler.complete_transaction(cur)
+    
+    def get_all_player_ids(self):
+        return [player.id for player in self.blue_team.values()] + [player.id for player in self.red_team.values()]
 
     def print_match_debug(self):
         """
