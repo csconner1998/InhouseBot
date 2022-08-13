@@ -7,7 +7,7 @@ import math
 from .player import Player
 from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
-import datetime
+from datetime import datetime
 
 class ActiveMatch(object):
     """
@@ -99,7 +99,6 @@ class ActiveMatch(object):
         """
         Sends the match report "report who won" message to the match thread
         """
-        print("stub send_match_report_result")
         cur = self.db_handler.get_cursor()
         who_won = discord.Embed(description="Who Won?", color=discord.Color.gold())
         won_message = await self.thread.send(embed=who_won)
@@ -116,16 +115,16 @@ class ActiveMatch(object):
         """        
         # Update players in db
         if winner == 'blue':
-            [player.write_player_to_db('w') for player in self.blue_team.values()]
-            [player.write_player_to_db('l') for player in self.red_team.values()]
+            [player.update_player_in_db('w') for player in self.blue_team.values()]
+            [player.update_player_in_db('l') for player in self.red_team.values()]
         if winner == 'red':
-            [player.write_player_to_db('l') for player in self.blue_team.values()]
-            [player.write_player_to_db('w') for player in self.red_team.values()]
+            [player.update_player_in_db('l') for player in self.blue_team.values()]
+            [player.update_player_in_db('w') for player in self.red_team.values()]
 
         # update matches in db
         cur = self.db_handler.get_cursor()
-        complete_match_sql = f"INSERT INTO matches(matchid, created,winner) VALUES ('{self.match_id}', '{str(datetime.now())}','{winner}') RETURNING matchid"
-        remove_active_match_sql = f"DELETE FROM active_matches WHERE win_msg_id = {self.match_id}'"
+        complete_match_sql = f"INSERT INTO matches(matchid, created, winner) VALUES ('{self.match_id}', '{str(datetime.now())}', '{winner}') RETURNING matchid"
+        remove_active_match_sql = f"DELETE FROM active_matches WHERE active_id = '{self.match_id}'"
         cur.execute(complete_match_sql)
         cur.execute(remove_active_match_sql)
         self.db_handler.complete_transaction(cur)
@@ -138,28 +137,26 @@ class ActiveMatch(object):
         self.red_team[role] = temp
 
         # Update DB
-        cur = self.db_handler.getCursor()
+        cur = self.db_handler.get_cursor()
         # does this work without a temp var? SQL smort.
         cmd = f"UPDATE active_matches SET {role}1 = {role}2, {role}2 = {role}1 WHERE active_id = {str(self.match_id)}"
         print(cmd)
         cur.execute(cmd)
-        self.db_handler.completeTransaction(cur)
+        self.db_handler.complete_transaction(cur)
         await self.send_match_description()
             
     def create_active_db_entry(self):
         """
         Helper to create an active_matches db entry for this match
         """
-        # TODO: insert new players if necessary
-        all_player_ids = self.get_all_player_ids()
-        
+        self.create_missing_players()
 
         player_ids_str = ""
         for key in roles:
             player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
         
         # strip last comma and insert
-        cmd = f"INSERT INTO active_matches({all_roles_db_key}) values ({player_ids_str.strip(',')}) returning active_id"
+        cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
@@ -167,8 +164,29 @@ class ActiveMatch(object):
         self.match_id = cur.fetchone()[0]
         self.db_handler.complete_transaction(cur)
     
-    def get_all_player_ids(self):
-        return [player.id for player in self.blue_team.values()] + [player.id for player in self.red_team.values()]
+    def create_missing_players(self):
+        all_players = self.get_all_players()
+  
+        cmd = f"SELECT id FROM players WHERE id IN {tuple([player.id for player in all_players])}"
+        cur = self.db_handler.get_cursor()
+        cur.execute(cmd)
+        existing_player_ids = [existing_player[0] for existing_player in cur.fetchall()]
+
+        for player in all_players:
+            if not player.id in existing_player_ids:
+                # insert missing player
+                insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '0', '{default_points}')"
+                cur.execute(insert_cmd)
+        
+        self.db_handler.complete_transaction(cursor=cur)
+            
+
+    # Utils
+    def get_all_players(self) -> list:
+        return [player for player in self.blue_team.values()] + [player for player in self.red_team.values()]
+    
+    def get_all_player_ids(self) -> list:
+        return [player.id for player in self.get_all_players()]
 
     def print_match_debug(self):
         """
@@ -178,7 +196,6 @@ class ActiveMatch(object):
         Blue Team: {self.blue_team}
         Red Team: {self.red_team}
         Thread ID: {self.thread.id}""")
-
 
 
 """

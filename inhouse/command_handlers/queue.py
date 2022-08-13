@@ -104,6 +104,10 @@ class Queue(object):
             print("active match found, completing...")
             await self.active_matches_by_message_id[message_id].complete_match(winner)
             del self.active_matches_by_message_id[message_id]
-            await main_leaderboard.update_leaderboard()
+
+            if main_leaderboard != None:
+                await main_leaderboard.update_leaderboard()
+            else:
+                await self.ctx.send("Match has been recorded but Leaderboard channel is not set, ask an Admin to set it!")
         else:
             print("not an active match to complete")

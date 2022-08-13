@@ -46,6 +46,8 @@ bot.intents.reactions = True
 bot.intents.members = True
 
 inhouse_role_id = None
+main_queue = None
+main_leaderboard = None
 
 @bot.event
 async def on_ready():
@@ -133,7 +135,7 @@ async def update_player_history(ctx, user: str, win_or_loss: str):
     player.update_player_in_db(win_or_loss)
     await ctx.respond("Player updated.")
     if main_leaderboard == None:
-        await ctx.respond("No leaderboard channel set currently")
+        await ctx.respond("No Leaderboard channel set currently, ask an Admin to set it")
         return
     await main_leaderboard.update_leaderboard()
 
@@ -158,8 +160,21 @@ async def on_raw_reaction_add(payload):
         await handle_queue_reaction(user=payload.member, emoji_id=payload.emoji.id, added_reaction=True)
 
     # handle complete match reactions
-    if payload.message_id in main_queue.active_matches_by_message_id.keys() and main_leaderboard != None:
-        await main_queue.attempt_complete_match(payload.message_id, '', main_leaderboard=main_leaderboard)
+    if payload.message_id in main_queue.active_matches_by_message_id.keys():
+        # Make sure the rector is a match reporter
+        if "Match Reporter" in [role.name for role in payload.member.roles]:
+            winner = ''
+            if payload.emoji.name == "🟦":
+                winner = 'blue'
+            elif payload.emoji.name == "🟥":
+                winner = 'red'
+            else:
+                await bot.get_message(payload.message_id).clear_reaction(emoji=payload.emoji)
+                return
+    
+            await main_queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard)
+        else:
+            await bot.get_message(payload.message_id).clear_reaction(emoji=payload.emoji)
 
 # This handles the bot removing people's reactins from the queue as well
 # i.e. if someone attempts to queue up while already in a game this handles the bot removing that reaction gracefully

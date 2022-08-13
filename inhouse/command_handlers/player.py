@@ -3,10 +3,6 @@ from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
 import re
 
-# TODO: return to 15/12
-win_points = 0
-loss_points = 0
-
 class Player(object):
     """
     Represents a player, holding data for:
