@@ -73,26 +73,26 @@ class Queue(object):
         Creates a new ActiveMatch from players in the queue. Should be triggered when an appropriate number of players is reached.
         Handles player priority as well as reaction cleanup for players selected.
         """
-        print("creating a match...")
 
-        # TODO: prio system goes here
-
-        match_players = {}
+        match_players = {role_top: [], role_jungle: [], role_mid: [], role_adc: [], role_support: []}
         # store the ids as just a list for pruning the reactions later
         match_player_ids = []
+
         for role, players in self.queued_players.items():
-            # Choose 2 players per role at random
-            match_players[role] = sample(players, 2)
+            if self.played_matches > 0:
+                # if at least one match has been completed, we use the queue as an actual queue rather than selecting randomly
+                match_players[role].append(players.pop(0))
+                match_players[role].append(players.pop(0))
+            else:
+                # otherwise just choose 2 per role at random
+                match_players[role] = sample(players, 2)
             match_player_ids += [player.id for player in match_players[role]]
 
-        # remove from internal queue representation
+        # remove selected players from internal queue representation
         for role in roles:
             keep_players = list(filter(lambda player: player.id not in match_player_ids, [player for player in self.queued_players[role]]))
-            print(keep_players)
             self.queued_players[role] = keep_players
         
-        print(self.queued_players)
-
         # create and begin match
         new_match = ActiveMatch(db_handler=self.db_handler)
         report_message = await new_match.begin(players=match_players, ctx=self.ctx)
@@ -109,8 +109,7 @@ class Queue(object):
                 await reaction.remove(user)
     
     async def attempt_complete_match(self, message_id, winner, main_leaderboard: Leaderboard):
-        print("attempting to complete match...")
-        # if this really is a complete active match, complete it & update leaderboard
+        # if this really is a complete active match, complete it & update leaderboard. Otherwise this function is a no-op
         if message_id in self.active_matches_by_message_id.keys():
             await self.active_matches_by_message_id[message_id].complete_match(winner)
             del self.active_matches_by_message_id[message_id]
@@ -120,8 +119,6 @@ class Queue(object):
                 await main_leaderboard.update_leaderboard()
             else:
                 await self.ctx.send("Match has been recorded but Leaderboard channel is not set, ask an Admin to set it!")
-        else:
-            print("not an active match to complete")
     
     # Utils
     def all_queued_player_ids(self) -> list:
