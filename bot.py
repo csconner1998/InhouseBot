@@ -15,10 +15,6 @@ from inhouse.db_util import DatabaseHandler
 from inhouse.constants import *
 from inhouse.command_handlers.queue import Queue
 from inhouse.command_handlers.leaderboard import Leaderboard
-#from inhouse.command_handlers.match import match
-#from inhouse.command_handlers.leaderboard import leaderboard
-
-print("done imports")
 
 """ SEQUENCE (v1):
 1) Bot executable starts
@@ -30,18 +26,23 @@ print("done imports")
 5) If the reaction is to one of these, the appropriate behavior is called on the queue:
     - Queue.attempt_create_match() for the Queue
     - Queue.complete_match(message_id, winner) for any match report
+
+TODO: manual game creation
 """
 load_dotenv()
+logger = make_logger()
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
-print("done load env")
+# Limits us to just 1 server so that slash commands get registered faster. Can be removed eventually.
+test_guild_id = int(os.getenv('GUILD_ID'))
 
 # Change only the no_category default string
 help_command = commands.DefaultHelpCommand(
     no_category = 'Commands',
     width = 100
 )
+
+
 description = "Hi! I am a bot to help with creating and loggin inhouses! Please use any of the following commands with a leading ! to use.\nInHouseBot by made by Conner Soule"
-test_guild_id = int(os.getenv('GUILD_ID'))
 
 bot = discord.Bot(debug_guilds=[test_guild_id])
 bot.intents.reactions = True
@@ -53,58 +54,77 @@ main_leaderboard = None
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    logger.info(f"Logged in as {bot.user}")
 
 # Ping
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description="Health check. Responds with 'pong'.")
 async def ping(ctx):
     await ctx.respond("pong")
-# TODO: match history command
 
 # TODO change all Bot Dev to Staff
+# MARK: Staff only commands
+
 # Start Queue
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description="Staff only command. Starts the InHouse Queue in the current channel.")
 async def start_queue(ctx):
-    # TODO: change this respond to like an image banner or smth nice
-    await ctx.respond("Creating Queue...")
+    logger.debug("Start Queue Command Invoked")
+    res = await ctx.respond("Creating Queue...")
     global main_queue
     main_queue = Queue(ctx=ctx)
     await main_queue.create_queue_message(inhouse_role_id)
+    await res.delete_original_message()
 
 # Reset Queue
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description="Staff only command. Resets the InHouse queue, clearing all players.")
 async def reset_queue(ctx):
-    await ctx.respond("Resetting Queue...")
+    logger.debug("Reset Queue Command Invoked")
+    if main_queue == None:
+        await ctx.respond("Queue has not been started, nothing to reset.")
+        return
+    res = await ctx.respond("Resetting Queue...")
     await ctx.send("Queue has been reset, any active matches will still be tracked. React to the new message to join!")
     await main_queue.reset_queue(inhouse_role_id)
+    await res.delete_original_message()
+
+# Stop Queue
+@commands.has_role("Bot Dev")
+@bot.slash_command(description="Staff only command. Completely stops the queue.")
+async def stop_queue(ctx):
+    logger.debug("Stop Queue Command Invoked")
+    res = await ctx.respond("Stopping Queue...")
+    await main_queue.stop_queue()
+    await res.delete_original_message()
 
 # Set Leaderboard Channel
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
 async def set_leaderboard_channel(ctx, channel_name: str):
+    logger.debug("Set Leaderboard Channel Command Invoked")
     channel_id = re.sub("[^0-9]", "", channel_name)
     channel = bot.get_channel(int(channel_id))
     if channel == None:
-        await ctx.respond("Channel not found")
+        await ctx.respond("Channel not found. Send as a #channel.")
         return
     global main_leaderboard
     main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
-    await ctx.respond("Leaderboard channel updated")
+    await ctx.respond("Leaderboard channel updated.")
 
-# Set inhouse role
+# Set InHouse role
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id])
-async def set_inhouse_role(ctx, role: str):
+@bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
+async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
+    logger.debug("Set Inhouse Role Command Invoked")
     global inhouse_role_id
     inhouse_role_id = role
-    await ctx.respond("Inhouse role updated")
+    res = await ctx.respond("Inhouse role updated")
 
 # Swap Players
 @commands.has_role("Bot Dev")
-@bot.slash_command(description= "Swap players in given role for a match. Must be sent in the match thread.", guild_ids=[test_guild_id])
+@bot.slash_command(description="Staff only comamnd. Swap players in given role for a match. Must be sent in the match thread.")
 async def swap_players(ctx, role: str):
+    logger.debug("Swap Players Command Invoked")
     if role.lower() not in roles:
         msg = discord.Embed(
             description="Please enter a valid role: top, jungle, mid, adc, support", color=discord.Color.gold())
@@ -124,8 +144,9 @@ async def swap_players(ctx, role: str):
 
 # Update player history (Add Wins or Losses)
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description="Staff only command. Manually add a win or loss to a given player. Send as @Player ['W' or 'L'].")
 async def update_player_history(ctx, user: str, win_or_loss: str):
+    logger.debug("Update Player History Command Invoked")
     if win_or_loss.lower() not in ['w', 'l']:
         msg = discord.Embed(
             description="Please send update as one of 'W' or 'L'", color=discord.Color.gold())
@@ -143,18 +164,31 @@ async def update_player_history(ctx, user: str, win_or_loss: str):
         return
     await main_leaderboard.update_leaderboard()
 
+# MARK: General user Commands
+# TODO: match history command, standing command
+@bot.slash_command(description="Get a player's leaderboard standing")
+async def standing(ctx, user: str):
+    logger.debug("Standing Command Invoked")
+    pass
+
+@bot.slash_command(description="Get overall match history for past N games")
+async def match_history(ctx, count: int):
+    logger.debug("Match History Command Invoked")
+    if count > 20:
+        await ctx.respond("Maximum count is 20.")
+        return
+
 @bot.event
 async def on_raw_reaction_add(payload):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
-        print("reaction from bot, ignoring...")
+        logger.debug("Reaction from bot, ignoring...")
         return
 
     # Handle Queue reactions
     if payload.message_id == main_queue.queue_message.id:
         # if the emoji isn't one of the role ones we should remove it
         if payload.emoji.id not in all_role_emojis:
-            print(f"non-role reaction id {payload.emoji} added, removing...")
             await main_queue.queue_message.clear_reaction(emoji=payload.emoji)
             return
         
@@ -176,15 +210,15 @@ async def on_raw_reaction_add(payload):
     
             await main_queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard)
         else:
-            await bot.get_message(payload.message_id).clear_reaction(emoji=payload.emoji)
+            await bot.get_message(payload.message_id).remove_reaction(emoji=payload.emoji, member=payload.member)
 
 # This handles the bot removing people's reactins from the queue as well
 # i.e. if someone attempts to queue up while already in a game this handles the bot removing that reaction gracefully
 @bot.event
 async def on_raw_reaction_remove(payload):
-    print(payload)
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
+        logger.debug("Reaction from bot, ignoring...")
         return
 
     # Handle Queue reaction remove
@@ -207,11 +241,10 @@ async def handle_queue_reaction(user, emoji, added_reaction: bool):
             await main_queue.queue_message.remove_reaction(emoji, member=user)
             return
 
-        # TODO: This works, uncomment once done testing
         # Allow players to react to only one role.
-        # if user.id in main_queue.all_queued_player_ids():
-        #     await main_queue.queue_message.remove_reaction(emoji, member=user)
-        #     return
+        if user.id in main_queue.all_queued_player_ids():
+            await main_queue.queue_message.remove_reaction(emoji, member=user)
+            return
 
     # add player to queue
     # how I wish for switch statements in python :(
@@ -239,5 +272,5 @@ async def handle_queue_reaction(user, emoji, added_reaction: bool):
             player_to_remove = found_players[0]
             main_queue.queued_players[role].remove(player_to_remove)
 
-
+logger.info("Bot Starting...")
 bot.run(os.environ.get('Discord_Key'))

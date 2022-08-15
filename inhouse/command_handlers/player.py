@@ -22,12 +22,11 @@ class Player(object):
         winNum = int(value[0])
         losNum = int(value[1])
         spNum = int(value[2])
-        # TODO: return win/loss nums to 1 from 0
         if str.lower(WinLoss) == "w":
-            winNum += 0
+            winNum += 1
             spNum += win_points
         else:
-            losNum += 0
+            losNum += 1
             spNum -= loss_points
             if spNum < 0:
                 spNum = 0

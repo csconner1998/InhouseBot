@@ -25,6 +25,7 @@ class ActiveMatch(object):
         self.blue_team: dict = None
         self.red_team: dict = None
         self.match_description_message: discord.Message = None
+        self.original_thread_message: discord.Message = None
 
     # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
     async def begin(self, players: dict, ctx) -> discord.Message:
@@ -70,6 +71,7 @@ class ActiveMatch(object):
         start_message = await ctx.send(embed=msg)
         # auto archive in 1 hour of inactivity
         self.thread: discord.Thread = await start_message.create_thread(name=f"Game {self.match_id}", auto_archive_duration=60)
+        self.original_thread_message = start_message
         await self.send_match_description()
         return await self.send_match_report_result()
 
@@ -81,19 +83,27 @@ class ActiveMatch(object):
 
         blue_string = ""
         red_string = ""
+        ping_string = ""
         for role, player in self.blue_team.items():
-            blue_string += f"{role}: <@{player.id}>\n"
+            blue_string += f"{role}: {player.name}\n"
+            ping_string += f"<@{player.id}> "
         for role, player in self.red_team.items():
-            red_string += f"{role}: <@{player.id}>\n"
+            red_string += f"{role}: {player.name}\n"
+            ping_string += f"<@{player.id}> "
 
         msg.add_field(name="Blue Team", value=blue_string.strip(), inline=True)
         msg.add_field(name="Red Team", value=red_string.strip(), inline=True)
-        sent_msg = await self.thread.send(embed=msg)
+        match_desc = await self.thread.send(embed=msg)
+
         # unpin old (if applicable) and pin new
         if self.match_description_message != None:
             await self.match_description_message.unpin()
-        await sent_msg.pin()
-        self.match_description_message = sent_msg
+        else:
+            # send the ping string if this is the first match desc
+            await self.thread.send(ping_string)
+
+        await match_desc.pin()
+        self.match_description_message = match_desc
 
     async def send_match_report_result(self) -> discord.Message:
         """
@@ -125,12 +135,24 @@ class ActiveMatch(object):
         cur = self.db_handler.get_cursor()
         complete_match_sql = f"INSERT INTO matches(matchid, created, winner) VALUES ('{self.match_id}', '{str(datetime.now())}', '{winner}') RETURNING matchid"
         remove_active_match_sql = f"DELETE FROM active_matches WHERE active_id = '{self.match_id}'"
+
+        #insert players
+        player_entries = ""
+        for role, player in self.blue_team.items():
+            player_entries += f"({self.match_id}, {player.id}, True, {role_str_to_db_id[role]}),"
+        for role, player in self.red_team.items():
+            player_entries += f"({self.match_id}, {player.id}, False, {role_str_to_db_id[role]}),"
+        match_players_sql = f"INSERT INTO matches_players(match_id, player_id, blue, role) VALUES {player_entries.strip(',')}"
+
         cur.execute(complete_match_sql)
+        cur.execute(match_players_sql)
         cur.execute(remove_active_match_sql)
         self.db_handler.complete_transaction(cur)
+        await self.original_thread_message.delete()
+        logger.debug("done creating match.")
     
     async def swap_players(self, role: str):
-        print(f"swapping players for {role}")
+        logger.debug(f"swapping players for {role}")
         # Update model
         temp = self.blue_team[role]
         self.blue_team[role] = self.red_team[role]
@@ -138,7 +160,6 @@ class ActiveMatch(object):
 
         # Update DB
         cur = self.db_handler.get_cursor()
-        # does this work without a temp var? SQL smort.
         cmd = f"UPDATE active_matches SET {role}1 = {role}2, {role}2 = {role}1 WHERE active_id = {str(self.match_id)}"
         print(cmd)
         cur.execute(cmd)
@@ -202,10 +223,10 @@ class ActiveMatch(object):
 
         
 
-async def getMatchHistory(ctx, db_handler):
+async def getMatchHistory(ctx, db_handler, count):
     await ctx.message.delete()
     cur = db_handler.getCursor()
-    cmd = "SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit 100;"
+    cmd = f"SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit {count};"
     cur.execute(cmd)
     retList = cur.fetchall()
     totalStr = "```Match History```"

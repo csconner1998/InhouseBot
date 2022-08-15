@@ -34,9 +34,9 @@ class Queue(object):
         
         if inhouse_role == None:
             await self.ctx.send(content="InHouse role is not set, ask an admin to set it.")
-        else:
-            await self.ctx.send(content=f"{inhouse_role}")
-        message = await self.ctx.send(content="InHouse Queue is open!", embed=msg)
+            inhouse_role = ""
+
+        message = await self.ctx.send(content=f"{inhouse_role} InHouse Queue is open!", embed=msg)
         self.queue_message = message
 
         # can maybe asyncio.gather these but runs into some REST overlap
@@ -58,6 +58,18 @@ class Queue(object):
             del players[:]
         await self.queue_message.delete()
         await self.create_queue_message(inhouse_role)
+        logger.debug("done resetting queue.")
+    
+    # stops the queue.
+    async def stop_queue(self):
+        """
+        Stop everything in the queue
+
+        NOTE: this does retain any currently active matches so that they can complete. HOWEVER, if a new queue is started, they will be lost.
+        """
+        for players in self.queued_players.values():
+            del players[:]
+        await self.queue_message.delete()
 
     async def attempt_create_match(self, bot: discord.Bot):
         """
