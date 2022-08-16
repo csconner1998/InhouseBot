@@ -53,7 +53,12 @@ class Leaderboard(object):
             msg.add_field(name="W/L", value=player_winlosses, inline=True)
             new_msgs_to_send.append(msg)
 
-        await self.channel.delete_messages(self.current_leaderboard_messages)
+        # clear previous messages in channel if this is a new leaderboard instance
+        if self.current_leaderboard_messages == []:
+            async for message in self.channel.history(limit=50):
+                await message.delete()
+        else:
+            await self.channel.delete_messages(self.current_leaderboard_messages)
         sent_messages = []
         for message in new_msgs_to_send:
             sentMsg = await self.channel.send(embed=message)

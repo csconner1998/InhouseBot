@@ -122,7 +122,9 @@ class ActiveMatch(object):
     async def complete_match(self, winner: str):
         """
         Completes a match with the given winner, either 'red' or 'blue'
-        """        
+        """
+        msg = discord.Embed(description=f":trophy: {winner.upper()} WINS! :trophy:", color=discord.Color.gold())
+        await self.thread.send(embed=msg)
         # Update players in db
         if winner == 'blue':
             [player.update_player_in_db('w') for player in self.blue_team.values()]
@@ -149,10 +151,8 @@ class ActiveMatch(object):
         cur.execute(remove_active_match_sql)
         self.db_handler.complete_transaction(cur)
         await self.original_thread_message.delete()
-        logger.debug("done creating match.")
     
     async def swap_players(self, role: str):
-        logger.debug(f"swapping players for {role}")
         # Update model
         temp = self.blue_team[role]
         self.blue_team[role] = self.red_team[role]

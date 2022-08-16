@@ -58,7 +58,6 @@ class Queue(object):
             del players[:]
         await self.queue_message.delete()
         await self.create_queue_message(inhouse_role)
-        logger.debug("done resetting queue.")
     
     # stops the queue.
     async def stop_queue(self):
@@ -122,15 +121,15 @@ class Queue(object):
     
     async def attempt_complete_match(self, message_id, winner, main_leaderboard: Leaderboard):
         # if this really is a complete active match, complete it & update leaderboard. Otherwise this function is a no-op
-        if message_id in self.active_matches_by_message_id.keys():
-            await self.active_matches_by_message_id[message_id].complete_match(winner)
-            del self.active_matches_by_message_id[message_id]
-            self.played_matches += 1
+        # clear the reactions first to stop people from multi-reacting & over-scoring
+        match_to_finish = self.active_matches_by_message_id.pop(message_id)
+        await match_to_finish.complete_match(winner)
+        self.played_matches += 1
 
-            if main_leaderboard != None:
-                await main_leaderboard.update_leaderboard()
-            else:
-                await self.ctx.send("Match has been recorded but Leaderboard channel is not set, ask an Admin to set it!")
+        if main_leaderboard != None:
+            await main_leaderboard.update_leaderboard()
+        else:
+            await self.ctx.send("Match has been recorded but Leaderboard channel is not set, ask an Admin to set it!")
     
     # Utils
     def all_queued_player_ids(self) -> list:

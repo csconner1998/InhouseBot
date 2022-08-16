@@ -27,22 +27,3 @@ new_player_db_key = "id, name, win, loss, ratio, sp"
 default_points = 500
 win_points = 15
 loss_points = 12
-
-# MARK: Logging
-# TODO: this should default to Error on deployed system.
-# Create a custom logger
-def make_logger():
-    logger = logging.getLogger(__name__)
-
-    # Create handlers
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.DEBUG)
-
-    # Create formatters and add it to handlers
-    c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
-    c_handler.setFormatter(c_format)
-
-    # Add handlers to the logger
-    logger.addHandler(c_handler)
-
-    return logger

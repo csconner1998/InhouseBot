@@ -30,7 +30,6 @@ from inhouse.command_handlers.leaderboard import Leaderboard
 TODO: manual game creation
 """
 load_dotenv()
-logger = make_logger()
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
 # Limits us to just 1 server so that slash commands get registered faster. Can be removed eventually.
 test_guild_id = int(os.getenv('GUILD_ID'))
@@ -54,7 +53,7 @@ main_leaderboard = None
 
 @bot.event
 async def on_ready():
-    logger.info(f"Logged in as {bot.user}")
+    print(f"Logged in as {bot.user}")
 
 # Ping
 @bot.slash_command(description="Health check. Responds with 'pong'.")
@@ -68,7 +67,6 @@ async def ping(ctx):
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Starts the InHouse Queue in the current channel.")
 async def start_queue(ctx):
-    logger.debug("Start Queue Command Invoked")
     res = await ctx.respond("Creating Queue...")
     global main_queue
     main_queue = Queue(ctx=ctx)
@@ -79,7 +77,6 @@ async def start_queue(ctx):
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Resets the InHouse queue, clearing all players.")
 async def reset_queue(ctx):
-    logger.debug("Reset Queue Command Invoked")
     if main_queue == None:
         await ctx.respond("Queue has not been started, nothing to reset.")
         return
@@ -92,7 +89,6 @@ async def reset_queue(ctx):
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Completely stops the queue.")
 async def stop_queue(ctx):
-    logger.debug("Stop Queue Command Invoked")
     res = await ctx.respond("Stopping Queue...")
     await main_queue.stop_queue()
     await res.delete_original_message()
@@ -101,7 +97,6 @@ async def stop_queue(ctx):
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
 async def set_leaderboard_channel(ctx, channel_name: str):
-    logger.debug("Set Leaderboard Channel Command Invoked")
     channel_id = re.sub("[^0-9]", "", channel_name)
     channel = bot.get_channel(int(channel_id))
     if channel == None:
@@ -115,16 +110,25 @@ async def set_leaderboard_channel(ctx, channel_name: str):
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
 async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
-    logger.debug("Set Inhouse Role Command Invoked")
     global inhouse_role_id
     inhouse_role_id = role
     res = await ctx.respond("Inhouse role updated")
+
+# Manual leaderboard refresh
+@commands.has_role("Bot Dev")
+@bot.slash_command(description="Staff only command. Refreshes the leaderboard.")
+async def refresh_leaderboard(ctx):
+    if main_leaderboard == None:
+        await ctx.respond("Leaderboard channel not set")
+    else:
+        await ctx.respond("Refreshing leaderboard...")
+        await main_leaderboard.update_leaderboard()
+
 
 # Swap Players
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only comamnd. Swap players in given role for a match. Must be sent in the match thread.")
 async def swap_players(ctx, role: str):
-    logger.debug("Swap Players Command Invoked")
     if role.lower() not in roles:
         msg = discord.Embed(
             description="Please enter a valid role: top, jungle, mid, adc, support", color=discord.Color.gold())
@@ -146,7 +150,6 @@ async def swap_players(ctx, role: str):
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Manually add a win or loss to a given player. Send as @Player ['W' or 'L'].")
 async def update_player_history(ctx, user: str, win_or_loss: str):
-    logger.debug("Update Player History Command Invoked")
     if win_or_loss.lower() not in ['w', 'l']:
         msg = discord.Embed(
             description="Please send update as one of 'W' or 'L'", color=discord.Color.gold())
@@ -168,12 +171,10 @@ async def update_player_history(ctx, user: str, win_or_loss: str):
 # TODO: match history command, standing command
 @bot.slash_command(description="Get a player's leaderboard standing")
 async def standing(ctx, user: str):
-    logger.debug("Standing Command Invoked")
     pass
 
 @bot.slash_command(description="Get overall match history for past N games")
 async def match_history(ctx, count: int):
-    logger.debug("Match History Command Invoked")
     if count > 20:
         await ctx.respond("Maximum count is 20.")
         return
@@ -182,7 +183,6 @@ async def match_history(ctx, count: int):
 async def on_raw_reaction_add(payload):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
-        logger.debug("Reaction from bot, ignoring...")
         return
 
     # Handle Queue reactions
@@ -207,9 +207,12 @@ async def on_raw_reaction_add(payload):
             else:
                 await bot.get_message(payload.message_id).clear_reaction(emoji=payload.emoji)
                 return
-    
-            await main_queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard)
+            
+            # remove reactions to prevent extras
+            await bot.get_message(payload.message_id).clear_reactions()
+            await main_queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard, bot=bot)
         else:
+            print("not a match reporter")
             await bot.get_message(payload.message_id).remove_reaction(emoji=payload.emoji, member=payload.member)
 
 # This handles the bot removing people's reactins from the queue as well
@@ -218,7 +221,6 @@ async def on_raw_reaction_add(payload):
 async def on_raw_reaction_remove(payload):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
-        logger.debug("Reaction from bot, ignoring...")
         return
 
     # Handle Queue reaction remove
@@ -272,5 +274,5 @@ async def handle_queue_reaction(user, emoji, added_reaction: bool):
             player_to_remove = found_players[0]
             main_queue.queued_players[role].remove(player_to_remove)
 
-logger.info("Bot Starting...")
+print("Bot Starting...")
 bot.run(os.environ.get('Discord_Key'))
