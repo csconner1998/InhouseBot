@@ -167,16 +167,22 @@ async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     await main_leaderboard.update_leaderboard()
 
 # MARK: General user Commands
-# TODO: match history command, standing command
-@bot.slash_command(description="Get a player's leaderboard standing")
-async def standing(ctx, user: str):
-    pass
+@bot.slash_command(description="Get a player's leaderboard standing. Send as @Player.")
+async def standing(ctx: discord.ApplicationContext, user: discord.Member):
+    res = await ctx.respond("Getting standing...")
+    await db_handler.get_standing(ctx=ctx, requested_user=user)
+    await res.delete_original_message()
 
-@bot.slash_command(description="Get overall match history for past N games")
+# Cooldown is once per 5 minutes to prevent spam
+@commands.cooldown(rate=1, per=300)
+@bot.slash_command(description="Get overall match history for past games")
 async def match_history(ctx, count: int):
     if count > 20:
         await ctx.respond("Maximum count is 20.")
         return
+    res = await ctx.respond("Getting match history...")
+    await db_handler.get_match_history(ctx=ctx, count=count)
+    await res.delete_original_message()
 
 @bot.event
 async def on_raw_reaction_add(payload):

@@ -218,39 +218,3 @@ class ActiveMatch(object):
         Red Team: {self.red_team}
         Thread ID: {self.thread.id}""")
 
-
-
-
-        
-
-async def getMatchHistory(ctx, db_handler, count):
-    await ctx.message.delete()
-    cur = db_handler.getCursor()
-    cmd = f"SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit {count};"
-    cur.execute(cmd)
-    retList = cur.fetchall()
-    totalStr = "```Match History```"
-    gameIDstr = ""
-    blueString = ""
-    redString = ""
-    for i in range(len(retList)):
-        if i % 10 == 0:
-            if i != 0:
-                totalStr += gameIDstr + "\n" + blueString + "\n" + redString + "\n\n"
-            gameIDstr="**__Game ID: " + str(retList[i][0]) + "__**"
-            redString = "**Red** | "
-            blueString = "**Blue** | "
-        #Is blue
-        if retList[i][2]:
-            blueString += retList[i][1] + " | "
-            if i % 5 == 4 and retList[i][3] == "blue":
-                blueString += " :trophy:"
-        #Is red
-        else:
-            redString += retList[i][1] + " | "
-            if i % 5 == 4 and retList[i][3] == "red":
-                redString += " :trophy:"
-    totalStr += gameIDstr + "\n" + blueString + "\n" + redString + "\n\n"
-    msg = discord.Embed(description=totalStr, color=discord.Color.gold())
-    await ctx.send(embed=msg)
-    cur.close()
