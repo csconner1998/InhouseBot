@@ -183,7 +183,8 @@ async def on_raw_reaction_add(payload):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
         return
-
+    if main_queue == None:
+        return
     # Handle Queue reactions
     if payload.message_id == main_queue.queue_message.id:
         # if the emoji isn't one of the role ones we should remove it
