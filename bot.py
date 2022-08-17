@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import re
 import os
 from inhouse.command_handlers.player import Player
+from riotwatcher import LolWatcher, ApiError
 
 # TODO: logger rather than prints
 
@@ -50,6 +51,11 @@ bot.intents.members = True
 inhouse_role_id = None
 main_queue: Queue = None
 main_leaderboard = None
+
+# Riot API watcher
+watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
+my_region = 'na1'
+
 
 @bot.event
 async def on_ready():
@@ -183,6 +189,24 @@ async def match_history(ctx, count: int):
     res = await ctx.respond("Getting match history...")
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
+
+# Set players nickname with Summoner Name
+@commands.has_role("Bot Dev")
+@bot.slash_command(guild_ids=[test_guild_id],pass_context=True)
+async def setname(ctx, summoner_name: str):
+    try:
+        role = discord.utils.get(ctx.guild.roles, name="Member")
+        sum = watcher.summoner.by_name(my_region,summoner_name)
+        await ctx.author.edit(nick='no working')
+    except ApiError as e:
+        code = e.response.status_code
+        if code == 401 or code == 403:
+            await ctx.respond("<@&1001367008086081547> needs to update riot API key. Please reachout to Staff to fix.")
+        await ctx.respond(summoner_name + " is not a summoner name")
+@bot.command(pass_context=True)
+async def chnick(ctx, member: discord.Member, nick):
+    await member.edit(nick=nick)
+    await ctx.send(f'Nickname was changed for {member.mention} ')
 
 @bot.event
 async def on_raw_reaction_add(payload):
