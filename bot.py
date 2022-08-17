@@ -222,7 +222,8 @@ async def on_raw_reaction_remove(payload):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
         return
-
+    if main_queue == None:
+        return
     # Handle Queue reaction remove
     if payload.message_id == main_queue.queue_message.id:
         # If a non-role reaction was removed, this function is a no-op
