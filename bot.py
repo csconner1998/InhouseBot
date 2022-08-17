@@ -201,6 +201,7 @@ async def setname(ctx, summoner_name: str):
         sum = watcher.summoner.by_name(my_region,summoner_name)
         await ctx.author.add_roles(role)
         await ctx.author.edit(nick=sum["name"])
+        await ctx.send("Welcome" + sum["name"])
     except ApiError as e:
         code = e.response.status_code
         if code == 401 or code == 403:
