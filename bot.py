@@ -149,15 +149,14 @@ async def swap_players(ctx, role: str):
 # Update player history (Add Wins or Losses)
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Staff only command. Manually add a win or loss to a given player. Send as @Player ['W' or 'L'].")
-async def update_player_history(ctx, user: str, win_or_loss: str):
+async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     if win_or_loss.lower() not in ['w', 'l']:
         msg = discord.Embed(
             description="Please send update as one of 'W' or 'L'", color=discord.Color.gold())
         await ctx.respond(embed=msg)
         return
     
-    # trim the tag crap off the user ID
-    user_id = re.sub("[^0-9]", "", user)
+    user_id = user.id
     # name doesn't matter in this context, we just need to link the id
     player = Player(user_id, name="", db_handler=db_handler)
     player.update_player_in_db(win_or_loss)
