@@ -194,19 +194,17 @@ async def match_history(ctx, count: int):
 @commands.has_role("Bot Dev")
 @bot.slash_command(guild_ids=[test_guild_id],pass_context=True)
 async def setname(ctx, summoner_name: str):
+    print(dir(ctx.author))
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")
         sum = watcher.summoner.by_name(my_region,summoner_name)
-        await ctx.author.edit(nick='no working')
+        await ctx.author.add_roles(role)
+        await ctx.author.edit(nick=sum["name"])
     except ApiError as e:
         code = e.response.status_code
         if code == 401 or code == 403:
             await ctx.respond("<@&1001367008086081547> needs to update riot API key. Please reachout to Staff to fix.")
         await ctx.respond(summoner_name + " is not a summoner name")
-@bot.command(pass_context=True)
-async def chnick(ctx, member: discord.Member, nick):
-    await member.edit(nick=nick)
-    await ctx.send(f'Nickname was changed for {member.mention} ')
 
 @bot.event
 async def on_raw_reaction_add(payload):
