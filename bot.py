@@ -67,11 +67,8 @@ async def on_ready():
 async def ping(ctx):
     await ctx.respond("pong")
 
-# TODO change all Bot Dev to Staff
-# MARK: Staff only commands
-
 # Start Queue
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Starts the InHouse Queue in the current channel.")
 async def start_queue(ctx):
     res = await ctx.respond("Creating Queue...")
@@ -81,7 +78,7 @@ async def start_queue(ctx):
     await res.delete_original_message()
 
 # Reset Queue
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Resets the InHouse queue, clearing all players.")
 async def reset_queue(ctx):
     if main_queue == None:
@@ -93,7 +90,7 @@ async def reset_queue(ctx):
     await res.delete_original_message()
 
 # Stop Queue
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Completely stops the queue.")
 async def stop_queue(ctx):
     res = await ctx.respond("Stopping Queue...")
@@ -101,7 +98,7 @@ async def stop_queue(ctx):
     await res.delete_original_message()
 
 # Set Leaderboard Channel
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
 async def set_leaderboard_channel(ctx, channel_name: str):
     channel_id = re.sub("[^0-9]", "", channel_name)
@@ -114,7 +111,7 @@ async def set_leaderboard_channel(ctx, channel_name: str):
     await ctx.respond("Leaderboard channel updated.")
 
 # Set InHouse role
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
 async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
     global inhouse_role_id
@@ -122,7 +119,7 @@ async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
     res = await ctx.respond("Inhouse role updated")
 
 # Manual leaderboard refresh
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Refreshes the leaderboard.")
 async def refresh_leaderboard(ctx):
     if main_leaderboard == None:
@@ -133,7 +130,7 @@ async def refresh_leaderboard(ctx):
 
 
 # Swap Players
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only comamnd. Swap players in given role for a match. Must be sent in the match thread.")
 async def swap_players(ctx, role: str):
     if role.lower() not in roles:
@@ -154,7 +151,7 @@ async def swap_players(ctx, role: str):
     await ctx.respond(f"Swapped {role}")
 
 # Update player history (Add Wins or Losses)
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Manually add a win or loss to a given player. Send as @Player ['W' or 'L'].")
 async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     if win_or_loss.lower() not in ['w', 'l']:
@@ -191,7 +188,7 @@ async def match_history(ctx, count: int):
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
 
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(guild_ids=[test_guild_id])
 async def send_channel(ctx, member_id: str, channel_id: str):
     try:
@@ -224,9 +221,9 @@ async def send_channel(ctx, member_id: str, channel_id: str):
         await ctx.send("<@" +str(member_id)+ "> is not in voice channel")
     return
 # Set players nickname with Summoner Name
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(guild_ids=[test_guild_id])
-async def set_name(ctx, summoner_name: str):
+async def setname(ctx, summoner_name: str):
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")
         sum = watcher.summoner.by_name(my_region,summoner_name)
