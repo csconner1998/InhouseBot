@@ -1,5 +1,3 @@
-import enum
-
 # MARK: IDs
 top_emoji_id = 1003021609239588875
 jg_emoji_id = 1003014949196546150
@@ -9,6 +7,11 @@ supp_emoji_id = 1003027602698670282
 all_role_emojis = [top_emoji_id, jg_emoji_id, mid_emoji_id, bot_emoji_id, supp_emoji_id]
 
 soulrush_bot_id = 197473689263013898
+
+name_assign_channel = 1009553154305695816
+bot_dev_role = 1001367008086081547
+
+voice_channels = [(997533706346573926, 998335001340944386),(998335056332455979, 998335026469027930),(998335076775514152,998335040964542524)]
 
 # MARK: ROLES
 role_top = 'top'
@@ -27,3 +30,6 @@ new_player_db_key = "id, name, win, loss, ratio, sp"
 default_points = 500
 win_points = 15
 loss_points = 12
+move_to_channel_delay = 30
+
+
