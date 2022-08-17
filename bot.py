@@ -1,4 +1,5 @@
 from concurrent.futures import thread
+from http.client import NOT_FOUND, HTTPException
 from optparse import Values
 import queue
 import discord
@@ -190,11 +191,42 @@ async def match_history(ctx, count: int):
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
 
+@commands.has_role("Bot Dev")
+@bot.slash_command(guild_ids=[test_guild_id])
+async def send_channel(ctx, member_id: str, channel_id: str):
+    try:
+        user_int_id = int(member_id)
+        member = await bot.fetch_user(user_int_id) 
+    except ValueError: # Python error if you cast a non-numeric string to int
+        await ctx.send(f"{member_id} is not a well-formed id.") # is not a number
+    except NOT_FOUND: #  # Discord error if there is no user for given id
+        await ctx.send(f"{user_int_id} is not a valid id.") # is a number but not a user
+    except HTTPException: # Discord error if could not contact server
+        await ctx.send(f"{user_int_id} could not be fetched.") # nothing to do with id
+    try:
+        channel_int_id = int(channel_id)
+        channel = await bot.fetch_channel(channel_int_id) 
+    except ValueError: # Python error if you cast a non-numeric string to int
+        await ctx.send(f"{channel_id} is not a well-formed id.") # is not a number
+    except NOT_FOUND: #  # Discord error if there is no user for given id
+        await ctx.send(f"{channel_int_id} is not a valid id.") # is a number but not a user
+    except HTTPException: # Discord error if could not contact server
+        await ctx.send(f"{channel_int_id} could not be fetched.") # nothing to do with id
+    if member == None:
+        await ctx.send(str(member_id)+ " is not a valid user ID")
+        return
+    if channel == None:
+        await ctx.send(str(channel)+ " is not a valid channel ID")
+        return
+    try:
+        await member.move_to(channel)
+    except:
+        await ctx.send("<@" +str(member_id)+ "> is not in voice channel")
+    return
 # Set players nickname with Summoner Name
 @commands.has_role("Bot Dev")
-@bot.slash_command(guild_ids=[test_guild_id],pass_context=True)
-async def setname(ctx, summoner_name: str):
-    print(dir(ctx.author))
+@bot.slash_command(guild_ids=[test_guild_id])
+async def set_name(ctx, summoner_name: str):
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")
         sum = watcher.summoner.by_name(my_region,summoner_name)
