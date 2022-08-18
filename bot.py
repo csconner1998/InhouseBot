@@ -190,12 +190,10 @@ async def match_history(ctx, count: int):
     await res.delete_original_message()
 
 # Set players nickname with Summoner Name
-@bot.slash_command(guild_ids=[test_guild_id])
+@bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
 async def setname(ctx, summoner_name: str):
     if ctx.channel_id != name_assign_channel:
-        owner = ctx.author
-        direct_message = await owner.create_dm()
-        await direct_message.send("Can only use /setname in #name-assign. If you need to change your name, please reach out to a Staff member")
+        await ctx.author.send("Can only use /setname in #name-assign. If you need to change your name, please reach out to a Staff member")
         return
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")
