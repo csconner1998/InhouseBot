@@ -111,6 +111,7 @@ async def set_leaderboard_channel(ctx, channel_name: str):
     await ctx.respond("Leaderboard channel updated.")
 
 # Set InHouse role
+# TODO: Make role be of type discord.Role
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
 async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):

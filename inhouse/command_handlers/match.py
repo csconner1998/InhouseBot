@@ -1,13 +1,12 @@
-from array import array
 from dis import disco
 from mimetypes import init
 import random
 import discord
-import math
 from .player import Player
 from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
 from datetime import datetime
+import asyncio
 
 class ActiveMatch(object):
     """
@@ -60,6 +59,15 @@ class ActiveMatch(object):
             red_team[role] = shuffled_players.pop()
         return {'blue': blue_team, 'red': red_team}
 
+    def get_empty_channels(self, ctx: discord.context.ApplicationContext):
+        for channel_pair in voice_channels:
+            blue_channel, red_channel = channel_pair
+            blue_length = len(ctx.guild.get_channel(blue_channel).members)
+            red_length = len(ctx.guild.get_channel(red_channel).members)
+            if blue_length == 0 and red_length == 0:
+                return channel_pair
+        return ("","")
+    
     async def create_match_thread(self, ctx: discord.context.ApplicationContext) -> discord.Message:
         """
         Helper to create a new discord thread for the match. Threads are set to auto-archive in 2 hours
@@ -73,6 +81,7 @@ class ActiveMatch(object):
         self.thread: discord.Thread = await start_message.create_thread(name=f"Game {self.match_id}", auto_archive_duration=60)
         self.original_thread_message = start_message
         await self.send_match_description()
+        await self.move_to_channels(ctx)
         return await self.send_match_report_result()
 
     async def send_match_description(self):
@@ -104,7 +113,31 @@ class ActiveMatch(object):
 
         await match_desc.pin()
         self.match_description_message = match_desc
-
+    async def send_channel(self, member: discord.Member, channel: discord.VoiceChannel):
+        try:
+            await member.move_to(channel)
+            return ""
+        except Exception as e:
+            print(e)
+            return "<@" + member.id + "> join <#" + channel.id + ">\n"
+    async def move_to_channels(self, ctx: discord.context.ApplicationContext):
+        await asyncio.sleep(move_to_channel_delay)
+        blue_channel_id, red_channel_id = self.get_empty_channels(ctx)
+        if blue_channel_id == "" or red_channel_id == "":
+            self.thread.send("No Inhouse Channels Open")
+            return
+        ping_channel_string = ""
+        for blue_player in self.blue_team:
+            member = ctx.guild.get_member(blue_player) 
+            channel = ctx.guild.get_channel(blue_channel_id) 
+            ping_channel_string += self.send_channel(member,channel)
+        for red_player in self.red_team:
+            member = ctx.guild.get_member(red_player) 
+            channel = ctx.guild.get_channel(red_channel_id) 
+            ping_channel_string += self.send_channel(member,channel)
+        if ping_channel_string != "":
+            await self.thread.send(ping_channel_string)
+            
     async def send_match_report_result(self) -> discord.Message:
         """
         Sends the match report "report who won" message to the match thread
