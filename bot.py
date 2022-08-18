@@ -216,7 +216,7 @@ async def on_raw_reaction_add(payload):
             
             # remove reactions to prevent extras
             await bot.get_message(payload.message_id).clear_reactions()
-            await main_queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard, bot=bot)
+            await main_queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard)
         else:
             print("not a match reporter")
             await bot.get_message(payload.message_id).remove_reaction(emoji=payload.emoji, member=payload.member)
