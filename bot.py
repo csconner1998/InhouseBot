@@ -1,4 +1,5 @@
 from concurrent.futures import thread
+from http.client import NOT_FOUND, HTTPException
 from optparse import Values
 import queue
 import discord
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 import re
 import os
 from inhouse.command_handlers.player import Player
+from riotwatcher import LolWatcher, ApiError
 
 # TODO: logger rather than prints
 
@@ -51,6 +53,11 @@ inhouse_role_id = None
 main_queue: Queue = None
 main_leaderboard = None
 
+# Riot API watcher
+watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
+my_region = 'na1'
+
+
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
@@ -60,11 +67,8 @@ async def on_ready():
 async def ping(ctx):
     await ctx.respond("pong")
 
-# TODO change all Bot Dev to Staff
-# MARK: Staff only commands
-
 # Start Queue
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Starts the InHouse Queue in the current channel.")
 async def start_queue(ctx):
     res = await ctx.respond("Creating Queue...")
@@ -74,7 +78,7 @@ async def start_queue(ctx):
     await res.delete_original_message()
 
 # Reset Queue
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Resets the InHouse queue, clearing all players.")
 async def reset_queue(ctx):
     if main_queue == None:
@@ -86,7 +90,7 @@ async def reset_queue(ctx):
     await res.delete_original_message()
 
 # Stop Queue
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Completely stops the queue.")
 async def stop_queue(ctx):
     res = await ctx.respond("Stopping Queue...")
@@ -94,7 +98,7 @@ async def stop_queue(ctx):
     await res.delete_original_message()
 
 # Set Leaderboard Channel
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
 async def set_leaderboard_channel(ctx, channel_name: str):
     channel_id = re.sub("[^0-9]", "", channel_name)
@@ -107,7 +111,8 @@ async def set_leaderboard_channel(ctx, channel_name: str):
     await ctx.respond("Leaderboard channel updated.")
 
 # Set InHouse role
-@commands.has_role("Bot Dev")
+# TODO: Make role be of type discord.Role
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
 async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
     global inhouse_role_id
@@ -115,7 +120,7 @@ async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
     res = await ctx.respond("Inhouse role updated")
 
 # Manual leaderboard refresh
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Refreshes the leaderboard.")
 async def refresh_leaderboard(ctx):
     if main_leaderboard == None:
@@ -126,7 +131,7 @@ async def refresh_leaderboard(ctx):
 
 
 # Swap Players
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only comamnd. Swap players in given role for a match. Must be sent in the match thread.")
 async def swap_players(ctx, role: str):
     if role.lower() not in roles:
@@ -147,7 +152,7 @@ async def swap_players(ctx, role: str):
     await ctx.respond(f"Swapped {role}")
 
 # Update player history (Add Wins or Losses)
-@commands.has_role("Bot Dev")
+@commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Manually add a win or loss to a given player. Send as @Player ['W' or 'L'].")
 async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     if win_or_loss.lower() not in ['w', 'l']:
@@ -183,6 +188,24 @@ async def match_history(ctx, count: int):
     res = await ctx.respond("Getting match history...")
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
+
+# Set players nickname with Summoner Name
+@bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
+async def setname(ctx, summoner_name: str):
+    if ctx.channel_id != name_assign_channel:
+        await ctx.author.send("Can only use /setname in #name-assign. If you need to change your name, please reach out to a Staff member")
+        return
+    try:
+        role = discord.utils.get(ctx.guild.roles, name="Member")
+        sum = watcher.summoner.by_name(my_region,summoner_name)
+        await ctx.author.add_roles(role)
+        await ctx.author.edit(nick=sum["name"])
+        await ctx.respond("Welcome " + sum["name"])
+    except ApiError as e:
+        code = e.response.status_code
+        if code == 401 or code == 403:
+            await ctx.respond("<@&"+bot_dev_role+"> needs to update riot API key. Please reachout to Staff to fix.")
+        await ctx.respond(summoner_name + " is not a summoner name")
 
 @bot.event
 async def on_raw_reaction_add(payload):

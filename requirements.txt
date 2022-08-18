@@ -1,3 +1,4 @@
 py-cord
 psycopg2
 python-dotenv
+riotwatcher
