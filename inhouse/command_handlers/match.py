@@ -120,6 +120,7 @@ class ActiveMatch(object):
         except Exception as e:
             print(e)
             return "<@" + member.id + "> join <#" + channel.id + ">\n"
+            
     async def move_to_channels(self, ctx: discord.context.ApplicationContext):
         await asyncio.sleep(move_to_channel_delay)
         blue_channel_id, red_channel_id = self.get_empty_channels(ctx)
