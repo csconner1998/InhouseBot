@@ -131,11 +131,11 @@ class ActiveMatch(object):
         for blue_player in self.blue_team:
             member = ctx.guild.get_member(blue_player) 
             channel = ctx.guild.get_channel(blue_channel_id) 
-            ping_channel_string += self.send_channel(member,channel)
+            ping_channel_string += await self.send_channel(member,channel)
         for red_player in self.red_team:
             member = ctx.guild.get_member(red_player) 
             channel = ctx.guild.get_channel(red_channel_id) 
-            ping_channel_string += self.send_channel(member,channel)
+            ping_channel_string += await self.send_channel(member,channel)
         if ping_channel_string != "":
             await self.thread.send(ping_channel_string)
             
