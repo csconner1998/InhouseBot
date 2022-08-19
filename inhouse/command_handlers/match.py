@@ -128,12 +128,12 @@ class ActiveMatch(object):
             self.thread.send("No Inhouse Channels Open")
             return
         ping_channel_string = ""
-        for blue_player in self.blue_team:
-            member = ctx.guild.get_member(blue_player) 
+        for blue_player in self.blue_team.values():
+            member = ctx.guild.get_member(blue_player.id) 
             channel = ctx.guild.get_channel(blue_channel_id) 
             ping_channel_string += await self.send_channel(member,channel)
-        for red_player in self.red_team:
-            member = ctx.guild.get_member(red_player) 
+        for red_player in self.red_team.values():
+            member = ctx.guild.get_member(red_player.id) 
             channel = ctx.guild.get_channel(red_channel_id) 
             ping_channel_string += await self.send_channel(member,channel)
         if ping_channel_string != "":
