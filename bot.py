@@ -164,7 +164,7 @@ async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     user_id = user.id
     # name doesn't matter in this context, we just need to link the id
     player = Player(user_id, name="", db_handler=db_handler)
-    player.update_player_in_db(win_or_loss)
+    player.update_inhouse_standings(win_or_loss)
     await ctx.respond("Player updated.")
     if main_leaderboard == None:
         await ctx.respond("No Leaderboard channel set currently, ask an Admin to set it")
