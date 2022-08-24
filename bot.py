@@ -197,7 +197,7 @@ async def show_rank(ctx, opt: bool):
 async def soloqueue(ctx):
     res = await ctx.respond("Getting soloqueue leaderboard...")
     names = await db_handler.get_names()
-    playerDict = Soloqueue_Leaderboard()
+    player_dict = Soloqueue_Leaderboard()
     for summoner in names:
         try:
             response = watcher.summoner.by_name(my_region,summoner[0]) 
@@ -206,7 +206,7 @@ async def soloqueue(ctx):
             rank = watcher.league.by_summoner(my_region,id)
             rankStr = ""
             for types in rank:
-                if types["queueType"] == "RANKED_SOLO_5x5":
+                if types["queueType"] == solo_queue:
                     tier = types["tier"]
                     playerRank = types["rank"]
                     lp = types["leaguePoints"]
@@ -216,12 +216,12 @@ async def soloqueue(ctx):
             if rankStr == "":
                 tier = types["tier"]
                 playerRank = types["rank"]
-            playerDict.add_player(name,tier,playerRank,lp)
+            player_dict.add_player(name,tier,playerRank,lp)
         except Exception as e:
             print(e)
     await res.delete_original_message()
-    printMsgs = playerDict.get_embbeded()
-    for msg in printMsgs:
+    print_msgs = player_dict.get_embbeded()
+    for msg in print_msgs:
         await ctx.send(embed=msg)
 
 
