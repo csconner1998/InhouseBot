@@ -27,7 +27,6 @@ from inhouse.command_handlers.soloqueue_leaderboard import Soloqueue_Leaderboard
 
 TODO: manual game creation
 """
-load_dotenv()
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
 # Limits us to just 1 server so that slash commands get registered faster. Can be removed eventually.
 test_guild_id = int(os.getenv('GUILD_ID'))
@@ -125,6 +124,18 @@ async def refresh_leaderboard(ctx):
         await ctx.respond("Refreshing leaderboard...")
         await main_leaderboard.update_leaderboard()
 
+@commands.has_role("Bot Dev")
+@bot.slash_command(description="Bot Dev only command.")
+async def add_to_db(ctx, user: discord.Member):
+    try: 
+        cur = db_handler.get_cursor()
+        insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{user.id}', '{user.name}', '0', '0', '0', '{default_points}')"
+        cur.execute(insert_cmd)
+        db_handler.complete_transaction(cur)
+        await ctx.respond("Done.")
+    except Exception as e:
+        print(e)
+        await ctx.respond("Something bork")
 
 # Swap Players
 @commands.has_role("Staff")
