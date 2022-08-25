@@ -3,6 +3,8 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import re
 import os
+
+from sqlalchemy import false
 from inhouse.command_handlers.player import Player
 from riotwatcher import LolWatcher, ApiError
 
@@ -109,7 +111,7 @@ async def set_leaderboard_channel(ctx, channel_name: str):
 # TODO: Make role be of type discord.Role
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
-async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
+async def set_inhouse_role(ctx: discord.ApplicationContext, role: discord.Role):
     global inhouse_role_id
     inhouse_role_id = role
     res = await ctx.respond("Inhouse role updated")
@@ -255,10 +257,16 @@ async def setname(ctx, summoner_name: str):
         await ctx.respond(summoner_name + " is not a summoner name")
 
 @bot.event
-async def on_raw_reaction_add(payload):
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
         return
+
+    # Inhouse Role
+    if payload.message_id == inhouse_role_assign_message:
+        await handle_inhouse_role_reaction(payload=payload)
+
+    # Rest of reactions are queue operations, if one isn't active, short-circuit
     if main_queue == None:
         return
     # Handle Queue reactions
@@ -308,6 +316,36 @@ async def on_raw_reaction_remove(payload):
         
         # Otherwise handle the removal
         await handle_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False)
+
+# MARK: Util functions
+
+async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
+    try:
+        print(payload.message_id)
+        # must get server nickname to match to summoner name
+        response = watcher.summoner.by_name(my_region, payload.member.nick)
+        id = response["id"]
+        leagues = watcher.league.by_summoner(my_region, id)
+        found_soloqueue = False
+        for league in leagues:
+            if league["queueType"] == solo_queue and league["tier"] in ["GOLD", "SILVER", "BRONZE", "IRON"]:
+                found_soloqueue = True
+                # remove inhouse role and dm them
+                await payload.member.remove_roles(inhouse_role_id)
+                await payload.member.send("Sorry! Competitive Inhouses are currently limited to Plat+ Soloqueue rank.")
+                await bot.get_message(inhouse_role_assign_message).remove_reaction(emoji=payload.emoji, member=payload.member)
+                return
+        
+        # If we got here, we can safely guve them the inhouse role
+        if found_soloqueue:
+            await payload.member.add_roles(inhouse_role_id)
+        else:
+            await payload.member.send("Sorry! Competitive Inhouses are currently limited to Plat+ Soloqueue rank.")
+            await bot.get_message(inhouse_role_assign_message).remove_reaction(emoji=payload.emoji, member=payload.member)
+    except Exception as e:
+        print(e)
+        await payload.member.remove_roles(inhouse_role_id)
+        await payload.member.send("Check that your discord name has been linked to your summoner name in #name-assign correctly, then try again. If the problem persists, please contact a staff member.")
 
 # NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
 # The function handles this on it's own.

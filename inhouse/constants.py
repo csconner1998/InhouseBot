@@ -11,6 +11,8 @@ soulrush_bot_id = 197473689263013898
 name_assign_channel = 1009553154305695816
 bot_dev_role = 1001367008086081547
 
+inhouse_role_assign_message = 1004608765334667404
+
 voice_channels = [(997533706346573926, 998335001340944386),(998335056332455979, 998335026469027930),(998335076775514152,998335040964542524)]
 
 # MARK: ROLES
@@ -28,6 +30,7 @@ new_player_db_key = "id, name, win, loss, ratio, sp"
 
 # MARK: League Constants
 solo_queue= "RANKED_SOLO_5x5"
+
 # MARK: Misc
 default_points = 500
 win_points = 15
