@@ -15,7 +15,17 @@ class DatabaseHandler:
     def complete_transaction(self, cursor):
         self.connection.commit()
         cursor.close()
-
+    async def get_names(self):
+        cur = self.get_cursor()
+        cmd = "SELECT name FROM players where show_rank = 'true';"
+        cur.execute(cmd)
+        retList = cur.fetchall()
+        return retList
+    async def set_show_rank(self,opt,id):
+        cur = self.get_cursor()
+        cmd = f"update players set show_rank = '{opt}' where id = '{id}';"
+        cur.execute(cmd)
+        self.complete_transaction(cur)
     async def get_match_history(self, ctx, count):
         cur = self.get_cursor()
         cmd = f"SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit {count*10};"

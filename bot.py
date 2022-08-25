@@ -1,10 +1,5 @@
-from concurrent.futures import thread
-from http.client import NOT_FOUND, HTTPException
-from optparse import Values
-import queue
 import discord
 from discord.ext import commands
-import random
 from dotenv import load_dotenv
 import re
 import os
@@ -17,6 +12,7 @@ from inhouse.db_util import DatabaseHandler
 from inhouse.constants import *
 from inhouse.command_handlers.queue import Queue
 from inhouse.command_handlers.leaderboard import Leaderboard
+from inhouse.command_handlers.soloqueue_leaderboard import Soloqueue_Leaderboard
 
 """ SEQUENCE (v1):
 1) Bot executable starts
@@ -188,6 +184,46 @@ async def match_history(ctx, count: int):
     res = await ctx.respond("Getting match history...")
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
+
+
+@bot.slash_command(description="Opt in or out of soloqueue leaderboard")
+async def show_rank(ctx, opt: bool):
+    await db_handler.set_show_rank(opt,ctx.author.id)
+    await ctx.respond("Updated")
+
+# Cooldown is once per 5 minutes to prevent spam
+@commands.cooldown(rate=1, per=300)
+@bot.slash_command(description="Shows soloqueue leaderboard")
+async def soloqueue(ctx):
+    res = await ctx.respond("Getting soloqueue leaderboard...")
+    names = await db_handler.get_names()
+    player_dict = Soloqueue_Leaderboard()
+    for summoner in names:
+        try:
+            response = watcher.summoner.by_name(my_region,summoner[0]) 
+            id = response["id"]
+            name = response["name"]
+            rank = watcher.league.by_summoner(my_region,id)
+            rankStr = ""
+            for types in rank:
+                if types["queueType"] == solo_queue:
+                    tier = types["tier"]
+                    playerRank = types["rank"]
+                    lp = types["leaguePoints"]
+                    break
+                else:
+                    pass
+            if rankStr == "":
+                tier = types["tier"]
+                playerRank = types["rank"]
+            player_dict.add_player(name,tier,playerRank,lp)
+        except Exception as e:
+            print(e)
+    await res.delete_original_message()
+    print_msgs = player_dict.get_embbeded()
+    for msg in print_msgs:
+        await ctx.send(embed=msg)
+
 
 # Set players nickname with Summoner Name
 @bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")

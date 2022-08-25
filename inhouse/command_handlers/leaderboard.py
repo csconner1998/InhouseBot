@@ -1,6 +1,4 @@
 import discord
-import re
-from inhouse.constants import soulrush_bot_id
 
 class Leaderboard(object):
     def __init__(self, db_handler, channel: discord.TextChannel) -> None:

@@ -1,5 +1,3 @@
-from dis import disco
-from mimetypes import init
 import random
 import discord
 from .player import Player
