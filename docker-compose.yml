@@ -1,0 +1,25 @@
+volumes:
+  db_data:
+
+services:
+  bot:
+    container_name: inhouse-bot
+    build: .
+    image: inhouse-bot:latest
+    env_file:
+      - .env.dev
+    restart: unless-stopped
+    ports:
+      - 443:443
+    depends_on: 
+      - db
+
+  db:
+    container_name: inhouse-bot-db
+    image: inhouse-bot-db:latest
+    environment:
+      POSTGRES_USER: utahesports
+      POSTGRES_PASSWORD: starforger
+      POSTGRES_DB: inhouse-bot-db
+    # volumes:
+    #   - db_data:/var/lib/postgresql/data/pgdata
