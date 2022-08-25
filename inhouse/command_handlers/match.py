@@ -167,11 +167,11 @@ class ActiveMatch(object):
         await self.thread.send(embed=msg)
         # Update players in db
         if winner == 'blue':
-            [player.update_player_in_db('w') for player in self.blue_team.values()]
-            [player.update_player_in_db('l') for player in self.red_team.values()]
+            [player.update_inhouse_standings('w') for player in self.blue_team.values()]
+            [player.update_inhouse_standings('l') for player in self.red_team.values()]
         if winner == 'red':
-            [player.update_player_in_db('l') for player in self.blue_team.values()]
-            [player.update_player_in_db('w') for player in self.red_team.values()]
+            [player.update_inhouse_standings('l') for player in self.blue_team.values()]
+            [player.update_inhouse_standings('w') for player in self.red_team.values()]
 
         # update matches in db
         cur = self.db_handler.get_cursor()
