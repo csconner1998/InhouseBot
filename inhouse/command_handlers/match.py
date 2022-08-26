@@ -119,7 +119,7 @@ class ActiveMatch(object):
             return ""
         except Exception as e:
             print(e)
-            return "<@" + member.id + "> join <#" + channel.id + ">\n"
+            return "<@" + str(member.id) + "> join <#" + str(channel.id) + ">\n"
             
     async def move_to_channels(self, ctx: discord.context.ApplicationContext):
         await asyncio.sleep(move_to_channel_delay)
