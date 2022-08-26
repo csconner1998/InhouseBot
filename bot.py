@@ -321,7 +321,6 @@ async def on_raw_reaction_remove(payload):
 
 async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
     try:
-        print(payload.message_id)
         # must get server nickname to match to summoner name
         response = watcher.summoner.by_name(my_region, payload.member.nick)
         id = response["id"]
