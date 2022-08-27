@@ -31,8 +31,7 @@ class Player(object):
             spNum -= loss_points
             if spNum < 0:
                 spNum = 0
-        ratioStr = int(100 * (winNum / (winNum + losNum)))
-        cmd = f"UPDATE players SET win = '{str(winNum)}', loss = '{str(losNum)}', sp = '{str(spNum)}', ratio = '{str(ratioStr)}' where id ='{str(self.id)}';"
+        cmd = f"UPDATE players SET win = '{str(winNum)}', loss = '{str(losNum)}', sp = '{str(spNum)}' where id ='{str(self.id)}';"
         cur.execute(cmd)
         self.db_handler.complete_transaction(cur)
     
