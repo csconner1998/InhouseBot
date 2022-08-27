@@ -1,5 +1,3 @@
-from dis import disco
-from mimetypes import init
 import random
 import discord
 from .player import Player
@@ -114,6 +112,7 @@ class ActiveMatch(object):
         await match_desc.pin()
         self.match_description_message = match_desc
     async def send_channel(self, member: discord.Member, channel: discord.VoiceChannel):
+        print(f"member: {member}, channel: {channel}")
         try:
             await member.move_to(channel)
             return ""
@@ -133,11 +132,13 @@ class ActiveMatch(object):
         ping_channel_string = ""
         for blue_player in self.blue_team.values():
             member = ctx.guild.get_member(blue_player.id) 
-            channel = ctx.guild.get_channel(blue_channel_id) 
+            channel = ctx.guild.get_channel(blue_channel_id)
+            print(f"member: {member}, channel: {channel}")
             ping_channel_string += await self.send_channel(member,channel)
         for red_player in self.red_team.values():
             member = ctx.guild.get_member(red_player.id) 
             channel = ctx.guild.get_channel(red_channel_id) 
+            print(f"member: {member}, channel: {channel}")
             ping_channel_string += await self.send_channel(member,channel)
         if ping_channel_string != "":
             await self.thread.send(ping_channel_string)
@@ -164,11 +165,11 @@ class ActiveMatch(object):
         await self.thread.send(embed=msg)
         # Update players in db
         if winner == 'blue':
-            [player.update_player_in_db('w') for player in self.blue_team.values()]
-            [player.update_player_in_db('l') for player in self.red_team.values()]
+            [player.update_inhouse_standings('w') for player in self.blue_team.values()]
+            [player.update_inhouse_standings('l') for player in self.red_team.values()]
         if winner == 'red':
-            [player.update_player_in_db('l') for player in self.blue_team.values()]
-            [player.update_player_in_db('w') for player in self.red_team.values()]
+            [player.update_inhouse_standings('l') for player in self.blue_team.values()]
+            [player.update_inhouse_standings('w') for player in self.red_team.values()]
 
         # update matches in db
         cur = self.db_handler.get_cursor()

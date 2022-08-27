@@ -14,7 +14,7 @@ class Player(object):
         self.id = id
         self.db_handler = db_handler
 
-    def update_player_in_db(self, WinLoss):
+    def update_inhouse_standings(self, WinLoss):
         self.update_name()
         cur = self.db_handler.get_cursor()
         cmd = f"SELECT win, loss,sp FROM players WHERE id ='{str(self.id)}'"
@@ -40,4 +40,7 @@ class Player(object):
         cmd = f"UPDATE players SET name = '{self.name}' where id ='{str(self.id)}'"
         cur.execute(cmd)
         self.db_handler.complete_transaction(cursor=cur)
+
+    def update_coins(self, amount: int):
+        cur = self.db_handler.get_cursor()
     
