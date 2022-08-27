@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import re
 import os
-
+from inhouse.command_handlers.causal_modes import CasualModePicker
 from inhouse.command_handlers.player import Player
 from riotwatcher import LolWatcher, ApiError
 
@@ -309,6 +309,12 @@ async def setname(ctx, summoner_name: str):
             await ctx.respond(f"<@&{bot_dev_role}> needs to update riot API key. Please reachout to Staff to fix.")
             return
         await ctx.respond(summoner_name + " is not a summoner name")
+
+@commands.has_role("Staff")
+@bot.slash_command(description="casual game modes")
+async def casual(ctx: discord.ApplicationContext):
+    await ctx.respond("Choose the modes you'd like to play!")
+    await ctx.send("Casual games", view=CasualModePicker(timeout=30))
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
