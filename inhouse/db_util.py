@@ -49,7 +49,7 @@ class DatabaseHandler:
 
     async def get_standing(self, ctx, requested_user: discord.Member):
         cur = self.get_cursor()
-        cmd = f"SELECT name, win, loss, ratio, sp FROM players WHERE id ='{str(requested_user.id)}'"
+        cmd = f"SELECT name, win, loss, sp FROM players WHERE id ='{str(requested_user.id)}'"
         cur.execute(cmd)
         value = cur.fetchone()
         win = value[1]

@@ -24,7 +24,7 @@ role_str_to_db_id = {role_top: 0, role_jungle: 1, role_mid: 2, role_adc: 3, role
 
 # MARK: DB Keys
 all_roles_db_key = "top1, jungle1, mid1, adc1, support1, top2, jungle2, mid2, adc2, support2"
-new_player_db_key = "id, name, win, loss, ratio, sp"
+new_player_db_key = "id, name, win, loss, sp"
 
 # MARK: Misc
 default_points = 500
