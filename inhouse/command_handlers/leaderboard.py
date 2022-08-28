@@ -1,6 +1,4 @@
 import discord
-import re
-from inhouse.constants import soulrush_bot_id
 
 class Leaderboard(object):
     def __init__(self, db_handler, channel: discord.TextChannel) -> None:
@@ -31,8 +29,11 @@ class Leaderboard(object):
 
             win = player[2]
             loss = player[3]
-            ratio = player[4]
-            SP = player[5]
+            if win + loss == 0:
+                ratio = 0
+            else:
+                ratio = int(win/(win+loss))
+            SP = player[4]
             name = player[1]
 
             player_names += f"{str(idx+1)}. {name}\n"

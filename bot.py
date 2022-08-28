@@ -1,13 +1,9 @@
-from concurrent.futures import thread
-from http.client import NOT_FOUND, HTTPException
-from optparse import Values
-import queue
 import discord
 from discord.ext import commands
-import random
 from dotenv import load_dotenv
 import re
 import os
+
 from inhouse.command_handlers.player import Player
 from riotwatcher import LolWatcher, ApiError
 
@@ -17,6 +13,7 @@ from inhouse.db_util import DatabaseHandler
 from inhouse.constants import *
 from inhouse.command_handlers.queue import Queue
 from inhouse.command_handlers.leaderboard import Leaderboard
+from inhouse.command_handlers.soloqueue_leaderboard import Soloqueue_Leaderboard
 
 """ SEQUENCE (v1):
 1) Bot executable starts
@@ -31,7 +28,6 @@ from inhouse.command_handlers.leaderboard import Leaderboard
 
 TODO: manual game creation
 """
-load_dotenv()
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
 # Limits us to just 1 server so that slash commands get registered faster. Can be removed eventually.
 test_guild_id = int(os.getenv('GUILD_ID'))
@@ -49,7 +45,7 @@ bot = discord.Bot(debug_guilds=[test_guild_id])
 bot.intents.reactions = True
 bot.intents.members = True
 
-inhouse_role_id = None
+inhouse_role = None
 main_queue: Queue = None
 main_leaderboard = None
 
@@ -74,7 +70,7 @@ async def start_queue(ctx):
     res = await ctx.respond("Creating Queue...")
     global main_queue
     main_queue = Queue(ctx=ctx)
-    await main_queue.create_queue_message(inhouse_role_id)
+    await main_queue.create_queue_message(inhouse_role)
     await res.delete_original_message()
 
 # Reset Queue
@@ -86,7 +82,7 @@ async def reset_queue(ctx):
         return
     res = await ctx.respond("Resetting Queue...")
     await ctx.send("Queue has been reset, any active matches will still be tracked. React to the new message to join!")
-    await main_queue.reset_queue(inhouse_role_id)
+    await main_queue.reset_queue(inhouse_role)
     await res.delete_original_message()
 
 # Stop Queue
@@ -114,9 +110,9 @@ async def set_leaderboard_channel(ctx, channel_name: str):
 # TODO: Make role be of type discord.Role
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the InHouse role to be pinged when the queue starts. Set as an @Role.")
-async def set_inhouse_role(ctx: discord.ApplicationContext, role: str):
-    global inhouse_role_id
-    inhouse_role_id = role
+async def set_inhouse_role(ctx: discord.ApplicationContext, role: discord.Role):
+    global inhouse_role
+    inhouse_role = role
     res = await ctx.respond("Inhouse role updated")
 
 # Manual leaderboard refresh
@@ -129,6 +125,18 @@ async def refresh_leaderboard(ctx):
         await ctx.respond("Refreshing leaderboard...")
         await main_leaderboard.update_leaderboard()
 
+@commands.has_role("Bot Dev")
+@bot.slash_command(description="Bot Dev only command.")
+async def add_to_db(ctx, user: discord.Member):
+    try: 
+        cur = db_handler.get_cursor()
+        insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{user.id}', '{user.name}', '0', '0', '0', '{default_points}')"
+        cur.execute(insert_cmd)
+        db_handler.complete_transaction(cur)
+        await ctx.respond("Done.")
+    except Exception as e:
+        print(e)
+        await ctx.respond("Something bork")
 
 # Swap Players
 @commands.has_role("Staff")
@@ -164,7 +172,7 @@ async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     user_id = user.id
     # name doesn't matter in this context, we just need to link the id
     player = Player(user_id, name="", db_handler=db_handler)
-    player.update_player_in_db(win_or_loss)
+    player.update_inhouse_standings(win_or_loss)
     await ctx.respond("Player updated.")
     if main_leaderboard == None:
         await ctx.respond("No Leaderboard channel set currently, ask an Admin to set it")
@@ -189,6 +197,46 @@ async def match_history(ctx, count: int):
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
 
+
+@bot.slash_command(description="Opt in or out of soloqueue leaderboard")
+async def show_rank(ctx, opt: bool):
+    await db_handler.set_show_rank(opt,ctx.author.id)
+    await ctx.respond("Updated")
+
+# Cooldown is once per 5 minutes to prevent spam
+@commands.cooldown(rate=1, per=300)
+@bot.slash_command(description="Shows soloqueue leaderboard")
+async def soloqueue(ctx):
+    res = await ctx.respond("Getting soloqueue leaderboard...")
+    names = await db_handler.get_names()
+    player_dict = Soloqueue_Leaderboard()
+    for summoner in names:
+        try:
+            response = watcher.summoner.by_name(my_region,summoner[0]) 
+            id = response["id"]
+            name = response["name"]
+            rank = watcher.league.by_summoner(my_region,id)
+            rankStr = ""
+            for types in rank:
+                if types["queueType"] == solo_queue:
+                    tier = types["tier"]
+                    playerRank = types["rank"]
+                    lp = types["leaguePoints"]
+                    break
+                else:
+                    pass
+            if rankStr == "":
+                tier = types["tier"]
+                playerRank = types["rank"]
+            player_dict.add_player(name,tier,playerRank,lp)
+        except Exception as e:
+            print(e)
+    await res.delete_original_message()
+    print_msgs = player_dict.get_embbeded()
+    for msg in print_msgs:
+        await ctx.send(embed=msg)
+
+
 # Set players nickname with Summoner Name
 @bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
 async def setname(ctx, summoner_name: str):
@@ -208,10 +256,16 @@ async def setname(ctx, summoner_name: str):
         await ctx.respond(summoner_name + " is not a summoner name")
 
 @bot.event
-async def on_raw_reaction_add(payload):
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     # bot reactions to any message are a no-op
     if payload.user_id == bot.user.id:
         return
+
+    # Inhouse Role (if they don't have it)
+    if payload.message_id == inhouse_role_assign_message and payload.member.get_role(inhouse_role.id) == None:
+        await handle_inhouse_role_reaction(payload=payload)
+
+    # Rest of reactions are queue operations, if one isn't active, short-circuit
     if main_queue == None:
         return
     # Handle Queue reactions
@@ -261,6 +315,37 @@ async def on_raw_reaction_remove(payload):
         
         # Otherwise handle the removal
         await handle_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False)
+
+# MARK: Util functions
+
+async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
+    try:
+        # must get server nickname to match to summoner name
+        response = watcher.summoner.by_name(my_region, payload.member.display_name)
+        summ_id = response['id']
+        leagues = watcher.league.by_summoner(my_region, summ_id)
+
+        tiers = []
+        for league in leagues:
+            if league['queueType'] in [solo_queue, flex_queue]:
+                tiers.append(league['tier'])
+
+        for tier in tiers:
+            if tier in ['PLATINUM', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER']:
+                await payload.member.add_roles(inhouse_role)
+                return
+
+        # if we got here, they aren't allowed
+        # DM them
+        await payload.member.send("Sorry! Competitive Inhouses are currently limited to Plat+ Solo/Flex rank.")
+        # fetch avoids a caching issue on bot restart
+        channel = await bot.fetch_channel(payload.channel_id)
+        msg = await channel.fetch_message(payload.message_id)
+        await msg.remove_reaction(emoji=payload.emoji, member=payload.member)
+        return
+    except Exception as e:
+        print(e)
+        await payload.member.send("Check that your discord name has been linked to your summoner name in #name-assign correctly, then try again. If the problem persists, please contact a staff member.")
 
 # NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
 # The function handles this on it's own.
