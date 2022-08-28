@@ -234,7 +234,7 @@ class ActiveMatch(object):
         for player in all_players:
             if not player.id in existing_player_ids:
                 # insert missing player
-                insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '0', '{default_points}')"
+                insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '{default_points}')"
                 cur.execute(insert_cmd)
         
         self.db_handler.complete_transaction(cursor=cur)
