@@ -119,7 +119,7 @@ class ActiveMatch(object):
         except Exception as e:
             print(e)
             if member != None and channel != None:
-                return f"<@{member.id}> join <#{channel.id}\n"
+                return f"<@{member.id}> join <#{channel.id}>\n"
             else:
                 return ""
             
