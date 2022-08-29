@@ -73,6 +73,16 @@ async def start_queue(ctx):
     await main_queue.create_queue_message(inhouse_role)
     await res.delete_original_message()
 
+# Test Start
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only command. Starts match in the current channel with test values.")
+async def test_match(ctx):
+    if main_queue == None:
+        await ctx.respond("Queue has not been started, nothing to test.")
+        return
+    res = await ctx.respond("Starting test match...")
+    await main_queue.force_start(bot=bot)
+    await res.delete_original_message()
 # Reset Queue
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Resets the InHouse queue, clearing all players.")
