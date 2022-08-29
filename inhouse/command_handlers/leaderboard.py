@@ -32,7 +32,7 @@ class Leaderboard(object):
             if win + loss == 0:
                 ratio = 0
             else:
-                ratio = int(win/(win+loss))
+                ratio = int(win/(win+loss) * 100)
             SP = player[4]
             name = player[1]
 
