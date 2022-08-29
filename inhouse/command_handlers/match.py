@@ -215,15 +215,12 @@ class ActiveMatch(object):
         """
         self.create_missing_players()
         player_ids_str = ""
-        if not self.is_test_match:
-            for key in roles:
-                player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
-        
-        # strip last comma and insert
         if self.is_test_match:
             cmd = f"INSERT INTO active_matches(top1) VALUES (NULL) RETURNING active_id"
         else:
-            cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
+            for key in roles:
+                player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
+                cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
@@ -240,6 +237,7 @@ class ActiveMatch(object):
         existing_player_ids = [existing_player[0] for existing_player in cur.fetchall()]
 
         for player in all_players:
+            # Check if player is a Test player (aka has id of -1)
             if player.id == -1:
                 continue
             elif not player.id in existing_player_ids:

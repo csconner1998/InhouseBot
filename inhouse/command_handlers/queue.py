@@ -1,12 +1,11 @@
 
 # There should only ever be one instance of this class per bot
 from random import sample
-from xmlrpc.client import boolean
 import discord
 from ..db_util import DatabaseHandler
 from .match import ActiveMatch
 from .leaderboard import Leaderboard
-from .test_player import TestPlayer
+from .player import Player
 import os
 from ..constants import *
 
@@ -82,7 +81,7 @@ class Queue(object):
             await self.create_match(bot)
     
     async def force_start(self, bot: discord.Bot):
-        test_player = TestPlayer()
+        test_player = Player(-1,"Test Player",self.db_handler)
         for role, players in self.queued_players.items():
             if len(players) < 2:
                 for i in range(2 - len(players)):
@@ -91,7 +90,7 @@ class Queue(object):
         await self.create_match(bot, True)
 
         
-    async def create_match(self, bot: discord.Bot, is_test : bool = False):
+    async def create_match(self, bot: discord.Bot, is_test: bool = False):
         """
         Creates a new ActiveMatch from players in the queue. Should be triggered when an appropriate number of players is reached.
         Handles player priority as well as reaction cleanup for players selected.
