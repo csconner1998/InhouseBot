@@ -51,6 +51,7 @@ main_queue: Queue = None
 main_leaderboard = None
 
 # Riot API watcher
+print(os.environ.get('Riot_Api_Key'))
 watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
 my_region = 'na1'
 
