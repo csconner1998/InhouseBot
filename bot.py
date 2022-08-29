@@ -1,4 +1,3 @@
-from tkinter.messagebox import NO
 import discord
 from discord.ext import commands
 import re
@@ -51,7 +50,6 @@ main_queue: Queue = None
 main_leaderboard = None
 
 # Riot API watcher
-print(os.environ.get('Riot_Api_Key'))
 watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
 my_region = 'na1'
 
@@ -405,6 +403,11 @@ async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
         print(e)
         await payload.member.send("Check that your discord name has been linked to your summoner name in #name-assign correctly, then try again. If the problem persists, please contact a staff member.")
 
+
+async def handle_manual_queue(user, role):
+    player = Player(user.id, name=user.display_name, db_handler=db_handler)
+    main_queue.queued_players[role].append(player)
+    await main_queue.attempt_create_match(bot=bot)
 
 # NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
 # The function handles this on it's own.
