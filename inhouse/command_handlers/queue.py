@@ -1,6 +1,7 @@
 
 # There should only ever be one instance of this class per bot
 from random import sample
+from xmlrpc.client import boolean
 import discord
 from ..db_util import DatabaseHandler
 from .match import ActiveMatch
