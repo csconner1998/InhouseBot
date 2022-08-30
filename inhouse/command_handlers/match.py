@@ -23,6 +23,7 @@ class ActiveMatch(object):
         self.red_team: dict = None
         self.match_description_message: discord.Message = None
         self.original_thread_message: discord.Message = None
+        self.is_test_match = False
 
     # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
     async def begin(self, players: dict, ctx) -> discord.Message:
@@ -163,6 +164,10 @@ class ActiveMatch(object):
         """
         msg = discord.Embed(description=f":trophy: {winner.upper()} WINS! :trophy:", color=discord.Color.gold())
         await self.thread.send(embed=msg)
+        if self.is_test_match:
+            await self.original_thread_message.delete()
+            return
+
         # Update players in db
         if winner == 'blue':
             [player.update_inhouse_standings('w') for player in self.blue_team.values()]
@@ -209,13 +214,13 @@ class ActiveMatch(object):
         Helper to create an active_matches db entry for this match
         """
         self.create_missing_players()
-
         player_ids_str = ""
-        for key in roles:
-            player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
-        
-        # strip last comma and insert
-        cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
+        if self.is_test_match:
+            cmd = f"INSERT INTO active_matches(top1) VALUES (NULL) RETURNING active_id"
+        else:
+            for key in roles:
+                player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
+                cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
@@ -232,7 +237,10 @@ class ActiveMatch(object):
         existing_player_ids = [existing_player[0] for existing_player in cur.fetchall()]
 
         for player in all_players:
-            if not player.id in existing_player_ids:
+            # Check if player is a Test player (aka has id of -1)
+            if player.id == -1:
+                continue
+            elif not player.id in existing_player_ids:
                 # insert missing player
                 insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '{default_points}')"
                 cur.execute(insert_cmd)

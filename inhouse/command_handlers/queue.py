@@ -5,6 +5,7 @@ import discord
 from ..db_util import DatabaseHandler
 from .match import ActiveMatch
 from .leaderboard import Leaderboard
+from .player import Player
 import os
 from ..constants import *
 
@@ -78,8 +79,18 @@ class Queue(object):
         print(self.queued_players)
         if all(len(queued_for_role) >= 2 for queued_for_role in self.queued_players.values()):
             await self.create_match(bot)
+    
+    async def force_start(self, bot: discord.Bot):
+        test_player = Player(-1,"Test Player",self.db_handler)
+        for role, players in self.queued_players.items():
+            if len(players) < 2:
+                for i in range(2 - len(players)):
+                    self.queued_players[role].append(test_player)
+        print(self.queued_players)
+        await self.create_match(bot, True)
 
-    async def create_match(self, bot: discord.Bot):
+        
+    async def create_match(self, bot: discord.Bot, is_test: bool = False):
         """
         Creates a new ActiveMatch from players in the queue. Should be triggered when an appropriate number of players is reached.
         Handles player priority as well as reaction cleanup for players selected.
@@ -97,7 +108,9 @@ class Queue(object):
             else:
                 # otherwise just choose 2 per role at random
                 match_players[role] = sample(players, 2)
-            match_player_ids += [player.id for player in match_players[role]]
+            for player in match_players[role]:
+                if player.id != -1:
+                    match_player_ids.append(player.id)
 
         # remove selected players from internal queue representation
         for role in roles:
@@ -106,6 +119,7 @@ class Queue(object):
         
         # create and begin match
         new_match = ActiveMatch(db_handler=self.db_handler)
+        new_match.is_test_match = is_test
         report_message = await new_match.begin(players=match_players, ctx=self.ctx)
 
         # Add this match to the queue's tracker
