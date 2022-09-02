@@ -5,7 +5,6 @@ import discord
 from ..db_util import DatabaseHandler
 from .match import ActiveMatch
 from .leaderboard import Leaderboard
-from .player import Player
 import os
 from ..constants import *
 
