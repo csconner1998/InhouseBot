@@ -4,6 +4,7 @@ from random import sample
 import discord
 from ..db_util import DatabaseHandler
 from .match import ActiveMatch
+from .player import Player
 from .leaderboard import Leaderboard
 import os
 from ..constants import *
@@ -88,7 +89,7 @@ class Queue(object):
         print(self.queued_players)
         await self.create_match(bot, True)
 
-    async def manual_create_match(self, bot: discord.Bot, playerList, is_test : bool = False):
+    async def manual_create_match(self, playerList, is_test : bool = False):
         """
         Creates a new ActiveMatch from players in playerList.
         """
@@ -131,7 +132,7 @@ class Queue(object):
 
         # remove selected players from internal queue representation
         for role in roles:
-            keep_players = list(filter(lambda player: player.id not in match_player_ids, [player for player in self.queued_players[role]]))
+            keep_players = list(filter(lambda player: player.id not in match_player_ids and player.id != -1, [player for player in self.queued_players[role]]))
             self.queued_players[role] = keep_players
         
         # create and begin match

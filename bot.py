@@ -1,4 +1,3 @@
-from tkinter.messagebox import NO
 import discord
 from discord.ext import commands
 import re
@@ -26,7 +25,6 @@ from inhouse.command_handlers.soloqueue_leaderboard import Soloqueue_Leaderboard
     - Queue.attempt_create_match() for the Queue
     - Queue.complete_match(message_id, winner) for any match report
 
-TODO: manual game creation
 """
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get(
     'DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
@@ -51,7 +49,6 @@ main_queue: Queue = None
 main_leaderboard = None
 
 # Riot API watcher
-print(os.environ.get('Riot_Api_Key'))
 watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
 my_region = 'na1'
 
@@ -104,7 +101,7 @@ async def make_match(ctx, blue_top: discord.Member, red_top: discord.Member, blu
     player = Player(red_support.id, name=red_support.display_name,
                     db_handler=db_handler)
     dummy_queued_players[role_support].append(player)
-    await main_queue.manual_create_match(bot,dummy_queued_players,True)
+    await main_queue.manual_create_match(dummy_queued_players)
     await res.delete_original_message()
 
 
@@ -404,7 +401,6 @@ async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
     except Exception as e:
         print(e)
         await payload.member.send("Check that your discord name has been linked to your summoner name in #name-assign correctly, then try again. If the problem persists, please contact a staff member.")
-
 
 # NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
 # The function handles this on it's own.
