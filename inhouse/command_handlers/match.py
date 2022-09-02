@@ -26,14 +26,14 @@ class ActiveMatch(object):
         self.is_test_match = False
 
     # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
-    async def begin(self, players: dict, ctx) -> discord.Message:
+    async def begin(self, players: dict, ctx, madeMatch: bool = False) -> discord.Message:
         """
         Begins this match, setting up the thread, sending all info messages, and doing database operations
         """
         print("beginning match...")
         # Choose teams
         print(f"attempting start with players {players}")
-        teams = self.choose_teams(players)
+        teams = self.choose_teams(players, madeMatch=madeMatch)
         self.blue_team = teams['blue']
         self.red_team = teams['red']
         self.player_ids = [player.id for role_list in players.values() for player in role_list]
@@ -44,7 +44,7 @@ class ActiveMatch(object):
         # create thread
         return await self.create_match_thread(ctx)
 
-    def choose_teams(self, all_players: dict) -> dict:
+    def choose_teams(self, all_players: dict, madeMatch: bool = False) -> dict:
         """
         Helper to choose teams for this match randomly
         """
@@ -53,7 +53,9 @@ class ActiveMatch(object):
         red_team = {}
         for role, players in all_players.items():
             # shuffle and pop (not really that necessary for 2 element list but sue me)
-            shuffled_players = random.sample(players, len(players))
+            # dont shuffle if its a manually created match
+            if not madeMatch:
+                shuffled_players = random.sample(players, len(players))
             blue_team[role] = shuffled_players.pop()
             red_team[role] = shuffled_players.pop()
         return {'blue': blue_team, 'red': red_team}
@@ -164,6 +166,7 @@ class ActiveMatch(object):
         """
         msg = discord.Embed(description=f":trophy: {winner.upper()} WINS! :trophy:", color=discord.Color.gold())
         await self.thread.send(embed=msg)
+        # if test match, lets not make a trip to the DB and stop here
         if self.is_test_match:
             await self.original_thread_message.delete()
             return
@@ -214,12 +217,17 @@ class ActiveMatch(object):
         Helper to create an active_matches db entry for this match
         """
         self.create_missing_players()
+
         player_ids_str = ""
+
+        # if test match, lets just make a dummy record in DB to store locally
         if self.is_test_match:
             cmd = f"INSERT INTO active_matches(top1) VALUES (NULL) RETURNING active_id"
         else:
             for key in roles:
                 player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
+
+                # strip last comma and insert
                 cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
@@ -237,7 +245,7 @@ class ActiveMatch(object):
         existing_player_ids = [existing_player[0] for existing_player in cur.fetchall()]
 
         for player in all_players:
-            # Check if player is a Test player (aka has id of -1)
+            # Check if player is a Test player (aka has id of -1) lets not create a DB record for them
             if player.id == -1:
                 continue
             elif not player.id in existing_player_ids:

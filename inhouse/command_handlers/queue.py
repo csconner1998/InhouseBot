@@ -4,8 +4,8 @@ from random import sample
 import discord
 from ..db_util import DatabaseHandler
 from .match import ActiveMatch
-from .leaderboard import Leaderboard
 from .player import Player
+from .leaderboard import Leaderboard
 import os
 from ..constants import *
 
@@ -89,8 +89,26 @@ class Queue(object):
         print(self.queued_players)
         await self.create_match(bot, True)
 
+    async def manual_create_match(self, playerList, is_test : bool = False):
+        """
+        Creates a new ActiveMatch from players in playerList.
+        """
+        match_players = {role_top: [], role_jungle: [], role_mid: [], role_adc: [], role_support: []}
+        # store the ids as just a list for pruning the reactions later
+
+        for role, players in playerList.items():
+            match_players[role].append(players.pop(0))
+            match_players[role].append(players.pop(0))
         
-    async def create_match(self, bot: discord.Bot, is_test: bool = False):
+        # create and begin match
+        new_match = ActiveMatch(db_handler=self.db_handler)
+        new_match.is_test_match = is_test
+        report_message = await new_match.begin(players=match_players, ctx=self.ctx)
+
+        # Add this match to the queue's tracker
+        self.active_matches_by_message_id[report_message.id] = new_match
+
+    async def create_match(self, bot: discord.Bot, is_test : bool = False):
         """
         Creates a new ActiveMatch from players in the queue. Should be triggered when an appropriate number of players is reached.
         Handles player priority as well as reaction cleanup for players selected.
@@ -114,7 +132,7 @@ class Queue(object):
 
         # remove selected players from internal queue representation
         for role in roles:
-            keep_players = list(filter(lambda player: player.id not in match_player_ids, [player for player in self.queued_players[role]]))
+            keep_players = list(filter(lambda player: player.id not in match_player_ids and player.id != -1, [player for player in self.queued_players[role]]))
             self.queued_players[role] = keep_players
         
         # create and begin match
@@ -124,6 +142,10 @@ class Queue(object):
 
         # Add this match to the queue's tracker
         self.active_matches_by_message_id[report_message.id] = new_match
+
+        # If we are a match created by /make_match we don't have to remove from queue msg (since its null)
+        if self.queue_message == None:
+            return
 
         # we do a get_message here to refresh the reaction cache so that we can use it to remove the correct ones
         # This avoids us having to map back to all the Discord User objects

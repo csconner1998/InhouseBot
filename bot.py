@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 import re
 import os
 
@@ -26,16 +25,16 @@ from inhouse.command_handlers.soloqueue_leaderboard import Soloqueue_Leaderboard
     - Queue.attempt_create_match() for the Queue
     - Queue.complete_match(message_id, winner) for any match report
 
-TODO: manual game creation
 """
-db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
+db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get(
+    'DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
 # Limits us to just 1 server so that slash commands get registered faster. Can be removed eventually.
 test_guild_id = int(os.getenv('GUILD_ID'))
 
 # Change only the no_category default string
 help_command = commands.DefaultHelpCommand(
-    no_category = 'Commands',
-    width = 100
+    no_category='Commands',
+    width=100
 )
 
 
@@ -63,6 +62,49 @@ async def on_ready():
 async def ping(ctx):
     await ctx.respond("pong")
 
+# makes match
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only command. Makes and starts a match, bypassing the queue.")
+async def make_match(ctx, blue_top: discord.Member, red_top: discord.Member, blue_jungle: discord.Member, red_jungle: discord.Member, blue_mid: discord.Member, red_mid: discord.Member, blue_adc: discord.Member, red_adc: discord.Member, blue_support: discord.Member, red_support: discord.Member):
+    if main_queue == None:
+        await ctx.respond("Please start a queue with /start_queue before making a match")
+        return
+    res = await ctx.respond("Creating Match...")
+    dummy_queued_players = {role_top: [], role_jungle: [], role_mid: [], role_adc: [], role_support: []}
+    player = Player(blue_top.id, name=blue_top.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_top].append(player)
+    player = Player(red_top.id, name=red_top.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_top].append(player)
+    player = Player(blue_jungle.id, name=blue_jungle.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_jungle].append(player)
+    player = Player(red_jungle.id, name=red_jungle.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_jungle].append(player)
+    player = Player(blue_mid.id, name=blue_mid.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_mid].append(player)
+    player = Player(red_mid.id, name=red_mid.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_mid].append(player)
+    player = Player(blue_adc.id, name=blue_adc.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_adc].append(player)
+    player = Player(red_adc.id, name=red_adc.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_adc].append(player)
+    player = Player(blue_support.id, name=blue_support.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_support].append(player)
+    player = Player(red_support.id, name=red_support.display_name,
+                    db_handler=db_handler)
+    dummy_queued_players[role_support].append(player)
+    await main_queue.manual_create_match(dummy_queued_players)
+    await res.delete_original_message()
+
+
 # Start Queue
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Starts the InHouse Queue in the current channel.")
@@ -83,6 +125,7 @@ async def test_match(ctx):
     res = await ctx.respond("Starting test match...")
     await main_queue.force_start(bot=bot)
     await res.delete_original_message()
+
 # Reset Queue
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Resets the InHouse queue, clearing all players.")
@@ -261,8 +304,10 @@ async def setname(ctx, summoner_name: str):
         await ctx.respond("Welcome " + sum["name"])
     except ApiError as e:
         code = e.response.status_code
+        print(e)
         if code == 401 or code == 403:
-            await ctx.respond("<@&"+bot_dev_role+"> needs to update riot API key. Please reachout to Staff to fix.")
+            await ctx.respond(f"<@&{bot_dev_role}> needs to update riot API key. Please reachout to Staff to fix.")
+            return
         await ctx.respond(summoner_name + " is not a summoner name")
 
 @bot.event
