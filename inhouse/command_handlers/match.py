@@ -14,7 +14,7 @@ class ActiveMatch(object):
     - The match thread
     - a DB handler
     """
-    def __init__(self, db_handler: DatabaseHandler) -> None:
+    def __init__(self, db_handler: DatabaseHandler, competitive: bool = False) -> None:
         print("creating new active match...")
         self.match_id = None
         self.db_handler = db_handler
@@ -24,6 +24,7 @@ class ActiveMatch(object):
         self.match_description_message: discord.Message = None
         self.original_thread_message: discord.Message = None
         self.is_test_match = False
+        self.is_competitive_match = competitive
 
     # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
     async def begin(self, players: dict, ctx, madeMatch: bool = False) -> discord.Message:
@@ -114,6 +115,7 @@ class ActiveMatch(object):
 
         await match_desc.pin()
         self.match_description_message = match_desc
+
     async def send_channel(self, member: discord.Member, channel: discord.VoiceChannel):
         print(f"member: {member}, channel: {channel}")
         try:
@@ -166,8 +168,15 @@ class ActiveMatch(object):
         """
         msg = discord.Embed(description=f":trophy: {winner.upper()} WINS! :trophy:", color=discord.Color.gold())
         await self.thread.send(embed=msg)
-        # if test match, lets not make a trip to the DB and stop here
-        if self.is_test_match:
+
+        # Always remove the active match
+        remove_active_cur = self.db_handler.get_cursor()
+        remove_active_match_sql = f"DELETE FROM active_matches WHERE active_id = '{self.match_id}'"
+        remove_active_cur.execute(remove_active_match_sql)
+        self.db_handler.complete_transaction(remove_active_cur)
+
+        # if test/non-competitive match, lets not make a trip to the DB and stop here
+        if self.is_test_match or not self.is_competitive_match:
             await self.original_thread_message.delete()
             return
 
@@ -182,7 +191,6 @@ class ActiveMatch(object):
         # update matches in db
         cur = self.db_handler.get_cursor()
         complete_match_sql = f"INSERT INTO matches(matchid, created, winner) VALUES ('{self.match_id}', '{str(datetime.now())}', '{winner}') RETURNING matchid"
-        remove_active_match_sql = f"DELETE FROM active_matches WHERE active_id = '{self.match_id}'"
 
         #insert players
         player_entries = ""
@@ -194,7 +202,6 @@ class ActiveMatch(object):
 
         cur.execute(complete_match_sql)
         cur.execute(match_players_sql)
-        cur.execute(remove_active_match_sql)
         self.db_handler.complete_transaction(cur)
         await self.original_thread_message.delete()
     
@@ -216,12 +223,14 @@ class ActiveMatch(object):
         """
         Helper to create an active_matches db entry for this match
         """
-        self.create_missing_players()
+        if self.is_competitive_match:
+            self.create_missing_players()
 
         player_ids_str = ""
 
-        # if test match, lets just make a dummy record in DB to store locally
-        if self.is_test_match:
+        # if test/casual match, lets just make a dummy record in DB to store locally
+        # TODO: track casual matches correctly, requires some schema changes. Would like to lump that in with coin functionality
+        if self.is_test_match or not self.is_competitive_match:
             cmd = f"INSERT INTO active_matches(top1) VALUES (NULL) RETURNING active_id"
         else:
             for key in roles:

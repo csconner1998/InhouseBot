@@ -16,17 +16,19 @@ class Queue(object):
     - dictionary of active matches by ID
     - Players in the queue by role
     """
-    def __init__(self, ctx: discord.context.ApplicationContext) -> None:
+    def __init__(self, ctx: discord.context.ApplicationContext, competitive: bool = False) -> None:
         # active matches should be {<message ID of match report>: Match object}
         self.active_matches_by_message_id = {}
         self.queued_players = {role_top: [], role_jungle: [], role_mid: [], role_adc: [], role_support: []}
         self.ctx = ctx
         # increments as matches are completed. Must be 1 or more to activate prio system
         self.played_matches = 0
-        self.queue_message = None
+        self.queue_message: discord.Message = None
         self.db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get('DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
+        # Marks if the queue is a competitive one, meaning we need to record things in the DB
+        self.is_competitive_queue = competitive
 
-    async def create_queue_message(self, inhouse_role):
+    async def create_queue_message(self, inhouse_role: discord.Role):
         """
         Should be called to create a new queue message
         """
@@ -37,7 +39,7 @@ class Queue(object):
             await self.ctx.send(content="InHouse role is not set, ask an admin to set it.")
             inhouse_role = ""
 
-        message = await self.ctx.send(content=f"{inhouse_role} InHouse Queue is open!", embed=msg)
+        message = await self.ctx.send(content=f"{inhouse_role.mention} InHouse Queue is open!", embed=msg)
         self.queue_message = message
 
         # can maybe asyncio.gather these but runs into some REST overlap
@@ -101,7 +103,7 @@ class Queue(object):
             match_players[role].append(players.pop(0))
         
         # create and begin match
-        new_match = ActiveMatch(db_handler=self.db_handler)
+        new_match = ActiveMatch(db_handler=self.db_handler, competitive=self.is_competitive_queue)
         new_match.is_test_match = is_test
         report_message = await new_match.begin(players=match_players, ctx=self.ctx)
 
@@ -134,26 +136,24 @@ class Queue(object):
         for role in roles:
             keep_players = list(filter(lambda player: player.id not in match_player_ids and player.id != -1, [player for player in self.queued_players[role]]))
             self.queued_players[role] = keep_players
-        
+
+        # we do a get_message here to refresh the reaction cache so that we can use it to remove the correct ones
+        # This avoids us having to map back to all the Discord User objects
+        # If we are a match created by /make_match we don't have to remove from queue msg (since its null)
+        if self.queue_message != None:    
+            for reaction in bot.get_message(self.queue_message.id).reactions:
+                player_reactions = await reaction.users().flatten()
+                users_to_remove = [user for user in player_reactions if user.id in match_player_ids]
+                for user in users_to_remove:
+                    await reaction.remove(user)
+            
         # create and begin match
-        new_match = ActiveMatch(db_handler=self.db_handler)
+        new_match = ActiveMatch(db_handler=self.db_handler, competitive=self.is_competitive_queue)
         new_match.is_test_match = is_test
         report_message = await new_match.begin(players=match_players, ctx=self.ctx)
 
         # Add this match to the queue's tracker
         self.active_matches_by_message_id[report_message.id] = new_match
-
-        # If we are a match created by /make_match we don't have to remove from queue msg (since its null)
-        if self.queue_message == None:
-            return
-
-        # we do a get_message here to refresh the reaction cache so that we can use it to remove the correct ones
-        # This avoids us having to map back to all the Discord User objects
-        for reaction in bot.get_message(self.queue_message.id).reactions:
-            player_reactions = await reaction.users().flatten()
-            users_to_remove = [user for user in player_reactions if user.id in match_player_ids]
-            for user in users_to_remove:
-                await reaction.remove(user)
     
     async def attempt_complete_match(self, message_id, winner, main_leaderboard: Leaderboard):
         # if this really is a complete active match, complete it & update leaderboard. Otherwise this function is a no-op
@@ -164,7 +164,8 @@ class Queue(object):
 
         if main_leaderboard != None:
             await main_leaderboard.update_leaderboard()
-        else:
+        elif self.is_competitive_queue:
+            # only send this if it's a competitive queue, otherwise just ignore (casual games have no leaderboard)
             await self.ctx.send("Match has been recorded but Leaderboard channel is not set, ask an Admin to set it!")
     
     # Utils
