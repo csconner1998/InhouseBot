@@ -162,7 +162,7 @@ class Queue(object):
         await match_to_finish.complete_match(winner)
         self.played_matches += 1
 
-        if main_leaderboard != None:
+        if main_leaderboard != None and self.is_competitive_queue:
             await main_leaderboard.update_leaderboard()
         elif self.is_competitive_queue:
             # only send this if it's a competitive queue, otherwise just ignore (casual games have no leaderboard)
