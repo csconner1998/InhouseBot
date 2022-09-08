@@ -1,15 +1,4 @@
-from dis import disco
 import discord
-from queue import Queue
-
-class RolesHolder():
-    def __init__(self, competitive_inhouse: discord.Role, casual_inhouse: discord.Role, normals: discord.Role, flex: discord.Role, aram: discord.Role, rgm: discord.Role) -> None:
-        self.competitive_inhouse = competitive_inhouse
-        self.casual_inhouse = casual_inhouse
-        self.normals = normals
-        self.flex = flex
-        self.aram = aram
-        self.rgm = rgm
 
 # MARK: IDs
 top_emoji_id = 1003021609239588875
@@ -18,6 +7,8 @@ mid_emoji_id = 1003024543494963220
 bot_emoji_id = 1003022277631283240
 supp_emoji_id = 1003027602698670282
 all_role_emojis = [top_emoji_id, jg_emoji_id, mid_emoji_id, bot_emoji_id, supp_emoji_id]
+
+aram_emoji_id = 1009563351946371102
 
 soulrush_bot_id = 197473689263013898
 
@@ -51,6 +42,3 @@ win_points = 15
 loss_points = 12
 move_to_channel_delay = 30
 
-casual_queue: Queue = None
-server_roles: RolesHolder = None
-main_queue: Queue = None

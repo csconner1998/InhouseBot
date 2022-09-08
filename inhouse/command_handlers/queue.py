@@ -3,11 +3,11 @@
 from random import sample
 import discord
 from ..db_util import DatabaseHandler
-from .match import ActiveMatch
+from .match import ActiveMatch, ActiveMatchARAM
 from .player import Player
 from .leaderboard import Leaderboard
 import os
-from ..constants import *
+from inhouse.constants import *
 
 class Queue(object):
     """
@@ -171,3 +171,49 @@ class Queue(object):
     # Utils
     def all_queued_player_ids(self) -> list:
         return [player.id for role_players in self.queued_players.values() for player in role_players]
+
+
+class AramQueue(Queue):
+    def __init__(self, ctx: discord.context.ApplicationContext, competitive: bool = False) -> None:
+        super().__init__(ctx, competitive)
+        self.queued_players = {"all": []}
+
+    async def create_queue_message(self, inhouse_role: discord.Role):
+        msg_str = f"```ARAM QUEUE```React to Play: <:ARAM:{aram_emoji_id}>\n"
+        msg = discord.Embed(description=msg_str, color=discord.Color.gold())
+        
+        if inhouse_role == None:
+            await self.ctx.send(content="InHouse role is not set, ask an admin to set it.")
+            inhouse_role = ""
+
+        message = await self.ctx.send(content=f"{inhouse_role.mention} ARAM InHouse Queue is open!", embed=msg)
+        self.queue_message = message
+
+        await self.queue_message.add_reaction(f"<:ARAM:{aram_emoji_id}>")
+
+
+    async def attempt_create_match(self, bot: discord.Bot):
+        print("attempting to create an ARAM match...")
+        if len(self.queued_players["all"]) == 10:
+            await self.create_match(bot)
+    
+    async def create_match(self, bot: discord.Bot, is_test: bool = False):
+        # If we are a match created by /make_match we don't have to remove from queue msg (since its null)
+        if self.queue_message != None:
+            # remove all the reactions and then re-add the bot's
+            await self.queue_message.clear_reaction(f"<:ARAM:{aram_emoji_id}>")
+            await self.queue_message.add_reaction(f"<:ARAM:{aram_emoji_id}>") 
+            
+        # create and begin match
+        new_match = ActiveMatchARAM(db_handler=self.db_handler, competitive=False)
+        new_match.is_test_match = is_test
+        report_message = await new_match.begin(players=self.queued_players, ctx=self.ctx)
+
+        # remove  players from internal queue representation
+        self.queued_players["all"].clear()
+
+        # Add this match to the queue's tracker
+        self.active_matches_by_message_id[report_message.id] = new_match
+
+    def all_queued_player_ids(self) -> list:
+        return [player.id for player in self.queued_players["all"]]
