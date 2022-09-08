@@ -6,12 +6,13 @@ RUN apt-get update \
 
 WORKDIR /bot
 
-# Copy files to work directory
-COPY bot.py ./
-COPY ./inhouse ./inhouse
 COPY requirements.txt .
 
 RUN pip3 install -r requirements.txt
+
+# Copy src files to work directory
+COPY bot.py ./
+COPY ./inhouse ./inhouse
 
 EXPOSE 443
 

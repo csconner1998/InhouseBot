@@ -97,7 +97,6 @@ CREATE TABLE "public"."players" (
     "name" character varying(50) NOT NULL,
     "win" integer NOT NULL,
     "loss" integer NOT NULL,
-    "ratio" integer NOT NULL,
     "sp" integer NOT NULL
 );
 ALTER TABLE public.players OWNER TO utahesports;
