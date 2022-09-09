@@ -108,8 +108,8 @@ async def make_match(ctx, blue_top: discord.Member, red_top: discord.Member, blu
 @bot.slash_command(description="Staff only command. Starts the InHouse Queue in the current channel.")
 async def start_queue(ctx):
     res = await ctx.respond("Creating Queue...")
-    main_queue = Queue(ctx=ctx, competitive=True)
-    await main_queue.create_queue_message(inhouse.constants.server_roles.competitive_inhouse)
+    inhouse.global_objects.main_queue = Queue(ctx=ctx, competitive=True)
+    await inhouse.global_objects.main_queue.create_queue_message(inhouse.constants.server_roles.competitive_inhouse)
     await res.delete_original_message()
 
 # Test Start
@@ -149,7 +149,9 @@ async def stop_queue(ctx, main_or_casual: str):
         inhouse.global_objects.main_queue = None
     elif main_or_casual.lower() == "casual" and inhouse.global_objects.casual_queue != None:
         await inhouse.global_objects.casual_queue.stop_queue()
+        await inhouse.global_objects.casual_queue_aram.stop_queue()
         inhouse.global_objects.casual_queue = None
+        inhouse.global_objects.casual_queue_aram = None
     else:
         await ctx.send("No queue to stop")
 
@@ -240,7 +242,7 @@ async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     
     user_id = user.id
     # name doesn't matter in this context, we just need to link the id
-    player = Player(user_id, name="", db_handler=db_handler)
+    player = Player(user_id, name=user.display_name, db_handler=db_handler)
     player.update_inhouse_standings(win_or_loss)
     await ctx.respond("Player updated.")
     if main_leaderboard == None:
@@ -326,7 +328,6 @@ async def setname(ctx, summoner_name: str):
             return
         await ctx.respond(summoner_name + " is not a summoner name")
 
-@commands.has_role("Staff")
 @bot.slash_command(description="casual game modes")
 async def casual(ctx: discord.ApplicationContext):
     print(inhouse.constants.server_roles)
