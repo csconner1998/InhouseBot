@@ -48,8 +48,6 @@ bot.intents.members = True
 
 main_leaderboard: Leaderboard = None
 
-# Riot API watcher
-watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
 my_region = 'na1'
 
 @bot.event
@@ -283,10 +281,10 @@ async def soloqueue(ctx):
     player_dict = Soloqueue_Leaderboard()
     for summoner in names:
         try:
-            response = watcher.summoner.by_name(my_region,summoner[0]) 
+            response = inhouse.global_objects.watcher.summoner.by_name(my_region,summoner[0]) 
             id = response["id"]
             name = response["name"]
-            rank = watcher.league.by_summoner(my_region,id)
+            rank = inhouse.global_objects.watcher.league.by_summoner(my_region,id)
             rankStr = ""
             for types in rank:
                 if types["queueType"] == solo_queue:
@@ -316,7 +314,7 @@ async def setname(ctx, summoner_name: str):
         return
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")
-        sum = watcher.summoner.by_name(my_region,summoner_name)
+        sum = inhouse.global_objects.watcher.summoner.by_name(my_region,summoner_name)
         await ctx.author.add_roles(role)
         await ctx.author.edit(nick=sum["name"])
         await ctx.respond("Welcome " + sum["name"])
@@ -451,9 +449,9 @@ async def handle_complete_match(payload, queue: Queue):
 async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
     try:
         # must get server nickname to match to summoner name
-        response = watcher.summoner.by_name(my_region, payload.member.display_name)
+        response = inhouse.global_objects.watcher.summoner.by_name(my_region, payload.member.display_name)
         summ_id = response['id']
-        leagues = watcher.league.by_summoner(my_region, summ_id)
+        leagues = inhouse.global_objects.watcher.league.by_summoner(my_region, summ_id)
 
         tiers = []
         for league in leagues:
@@ -522,5 +520,6 @@ async def handle_queue_reaction(user, emoji, added_reaction: bool, queue_to_hand
             queue_to_handle.queued_players[role].remove(player_to_remove)
 
 print("Bot Starting...")
+print(inhouse.global_objects.watcher)
 bot.run(os.environ.get('Discord_Key'))
 

@@ -35,10 +35,12 @@ new_player_db_key = "id, name, win, loss, sp"
 # MARK: League Constants
 solo_queue = "RANKED_SOLO_5x5"
 flex_queue = "RANKED_FLEX_SR"
+region = 'na1'
 
 # MARK: Misc
 default_points = 500
 win_points = 15
 loss_points = 12
 move_to_channel_delay = 30
+casual_game_timeout = 21600
 
