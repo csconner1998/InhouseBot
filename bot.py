@@ -3,6 +3,7 @@ from discord.ext import commands
 import re
 import os
 from inhouse.command_handlers.causal_modes import CasualModePicker, active_players_set
+from inhouse.command_handlers.coin_manager import CoinManager
 from inhouse.command_handlers.player import Player
 from riotwatcher import LolWatcher, ApiError
 
@@ -30,6 +31,8 @@ from inhouse.command_handlers.soloqueue_leaderboard import Soloqueue_Leaderboard
 """
 db_handler = DatabaseHandler(host=os.environ.get('DB_HOST'), db_name=os.environ.get(
     'DB_NAME'), user=os.environ.get('DB_USER'), password=os.environ.get('DB_PASS'))
+
+inhouse.global_objects.coin_manager = CoinManager(db_handler=db_handler)
 # Limits us to just 1 server so that slash commands get registered faster. Can be removed eventually.
 test_guild_id = int(os.getenv('GUILD_ID'))
 
@@ -247,6 +250,19 @@ async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
         await ctx.respond("No Leaderboard channel set currently, ask an Admin to set it")
         return
     await main_leaderboard.update_leaderboard()
+
+# Add or remove coins from a member
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only command. Manually update a member's Wonkoin.")
+async def update_member_coins(ctx, member: discord.Member, update_amount: int):
+    inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=update_amount)
+    await ctx.respond("Coins updated")
+
+@bot.slash_command(description="Check your Wonkoin balance.")
+async def balance(ctx: discord.ApplicationContext):
+    coin_balance = inhouse.global_objects.coin_manager.get_member_coins(member=ctx.author)
+    embed_msg = discord.Embed(title="💰 BALANCE 💰", description=f"You have **{coin_balance}** Wonkoin", color=discord.Color.dark_gold())
+    await ctx.respond(embed=embed_msg)
 
 # MARK: General user Commands
 @bot.slash_command(description="Get a player's leaderboard standing. Send as @Player.")

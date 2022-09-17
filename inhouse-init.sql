@@ -127,6 +127,14 @@ CREATE SEQUENCE "public"."roles_roleid_seq"
 ALTER TABLE public.roles_roleid_seq OWNER TO utahesports;
 ALTER SEQUENCE "public"."roles_roleid_seq" OWNED BY "public"."roles"."roleid";
 
+-- Coins
+
+CREATE TABLE "public"."coins" (
+    "discord_id" bigint NOT NULL,
+    "coin_count" integer NOT NULL
+);
+ALTER TABLE public.roles OWNER TO utahesports;
+
 -- Sequence ID setip
 
 ALTER TABLE ONLY "public"."active_matches" ALTER COLUMN "active_id" SET DEFAULT "nextval"('"public"."active_matches_active_id_seq"'::"regclass");
@@ -168,6 +176,9 @@ ALTER TABLE ONLY "public"."players"
 
 ALTER TABLE ONLY "public"."roles"
     ADD CONSTRAINT "roles_pkey" PRIMARY KEY ("roleid");
+
+ALTER TABLE ONLY "public"."coins"
+    ADD CONSTRAINT "coins_pkey" PRIMARY KEY ("discord_id");
 
 -- FKs
 
