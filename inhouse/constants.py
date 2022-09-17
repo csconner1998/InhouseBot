@@ -1,4 +1,5 @@
 import discord
+# TODO: all of these should be a config yml/json in the future.
 
 # MARK: IDs
 top_emoji_id = 1003021609239588875
@@ -42,5 +43,14 @@ default_points = 500
 win_points = 15
 loss_points = 12
 move_to_channel_delay = 30
+
+# 6 hours in seconds
 casual_game_timeout = 21600
+
+coins_for_casual_game = 50
+coins_for_competitive_inhouse_win = 300
+coins_for_competitive_inhouse_loss = coins_for_competitive_inhouse_win / 2
+coins_for_casual_inhouse_win = 100
+coins_for_casual_inhouse_loss = coins_for_casual_inhouse_win / 2
+
 

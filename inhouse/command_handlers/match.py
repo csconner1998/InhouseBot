@@ -3,6 +3,7 @@ import discord
 from .player import Player
 from inhouse.constants import *
 from inhouse.db_util import DatabaseHandler
+import inhouse.global_objects
 from datetime import datetime
 import asyncio
 
@@ -176,17 +177,35 @@ class ActiveMatch(object):
         self.db_handler.complete_transaction(remove_active_cur)
 
         # if test/non-competitive match, lets not make a trip to the DB and stop here
-        if self.is_test_match or not self.is_competitive_match:
+        if self.is_test_match:
             await self.original_thread_message.delete()
             return
 
         # Update players in db
         if winner == 'blue':
-            [player.update_inhouse_standings('w') for player in self.blue_team.values()]
-            [player.update_inhouse_standings('l') for player in self.red_team.values()]
+            if self.is_competitive_match:
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.blue_team.values()], coin_amount=coins_for_competitive_inhouse_win)
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.red_team.values()], coin_amount=coins_for_competitive_inhouse_loss)
+                [player.update_inhouse_standings('w') for player in self.blue_team.values()]
+                [player.update_inhouse_standings('l') for player in self.red_team.values()]
+            else:
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.blue_team.values()], coin_amount=coins_for_casual_inhouse_win)
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.red_team.values()], coin_amount=coins_for_casual_inhouse_loss)
+
         if winner == 'red':
-            [player.update_inhouse_standings('l') for player in self.blue_team.values()]
-            [player.update_inhouse_standings('w') for player in self.red_team.values()]
+            if self.is_competitive_match:
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.red_team.values()], coin_amount=coins_for_competitive_inhouse_win)
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.blue_team.values()], coin_amount=coins_for_competitive_inhouse_loss)
+                [player.update_inhouse_standings('l') for player in self.blue_team.values()]
+                [player.update_inhouse_standings('w') for player in self.red_team.values()]
+            else:
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.red_team.values()], coin_amount=coins_for_casual_inhouse_win)
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.blue_team.values()], coin_amount=coins_for_casual_inhouse_loss)
+
+        # if it's non-competitive, we can skip the rest of the DB stuff
+        if not self.is_competitive_match:
+            await self.original_thread_message.delete()
+            return
 
         # update matches in db
         cur = self.db_handler.get_cursor()

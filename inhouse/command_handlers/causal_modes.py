@@ -132,9 +132,13 @@ class CasualLobby(object):
         for player, game_count in games_to_credit_by_player.items():
             embed_msg.add_field(name="Player", value=player, inline=True)
             embed_msg.add_field(name="Games Played", value=game_count, inline=True)
-            # TODO: hardcoded stuff, return when Wonkoin actually goes in
-            #embed_msg.add_field(name="Wonkoin Earned", value=game_count * 100, inline=True)
-
+            embed_msg.add_field(name="Wonkoin Earned", value=game_count * inhouse.constants.coins_for_casual_game, inline=True)
+            
+            member = self.thread.guild.get_member_named(name=player)
+            if not member == None: 
+                inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=game_count * inhouse.constants.coins_for_casual_game)
+            else:
+                print(f"could not find member {player}, did not update coins")
 
         await self.thread.send(f"Done! Rewards have been granted!", embed=embed_msg)
 
