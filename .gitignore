@@ -132,6 +132,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# production compose file on deployment server
+docker-compose-prod.yml
+
 # Spyder project settings
 .spyderproject
 .spyproject

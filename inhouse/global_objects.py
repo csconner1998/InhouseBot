@@ -1,3 +1,5 @@
+from riotwatcher import LolWatcher, ApiError
+from inhouse.command_handlers.coin_manager import CoinManager
 from inhouse.command_handlers.queue import *
 
 class RolesHolder():
@@ -13,3 +15,5 @@ casual_queue: Queue = None
 casual_queue_aram: AramQueue = None
 server_roles: RolesHolder = None
 main_queue: Queue = None
+watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
+coin_manager: CoinManager = None
