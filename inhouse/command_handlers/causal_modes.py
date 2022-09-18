@@ -80,7 +80,7 @@ class CasualLobby(object):
         print("done changing lobby")
 
     async def check_matches(self):
-        if len(self.participants) < 1:
+        if len(self.participants) < 2:
             print("not enough participants for rewards")
             await self.thread.send("In order to get rewards, you must have played with at least 1 game with 1 other server member")
             await self.original_thread_message.delete()
@@ -121,7 +121,7 @@ class CasualLobby(object):
 
             print(server_players)
             # make sure there were actually 2 or more players from the server in the game before giving credit
-            if len(server_players) >= 1:
+            if len(server_players) >= 2:
                 for summoner in server_players:    
                     games_to_credit_by_player[summoner] = games_to_credit_by_player.get(summoner, 0) + 1
         
@@ -133,7 +133,7 @@ class CasualLobby(object):
             embed_msg.add_field(name="Player", value=player, inline=True)
             embed_msg.add_field(name="Games Played", value=game_count, inline=True)
             embed_msg.add_field(name="Wonkoin Earned", value=game_count * inhouse.constants.coins_for_casual_game, inline=True)
-            
+
             member = self.thread.guild.get_member_named(name=player)
             if not member == None: 
                 inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=game_count * inhouse.constants.coins_for_casual_game)
