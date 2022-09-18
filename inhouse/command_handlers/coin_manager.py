@@ -6,7 +6,7 @@ class CoinManager(object):
         self.db_handler = db_handler
 
     def update_member_coins(self, member: discord.Member, coin_amount: int):
-        self.create_member_entry_if_necessary(member=member.id)
+        self.create_member_entry_if_necessary(member_id=member.id)
         cmd = f"UPDATE coins SET coin_count = coin_count + {coin_amount} WHERE discord_id = '{member.id}' "
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
@@ -16,13 +16,13 @@ class CoinManager(object):
         for member_id in member_ids:
             self.create_member_entry_if_necessary(member_id=member_id)
 
-        cmd = f"UPDATE coins SET coin_count = coin_count + {coin_amount} WHERE discord_id IN '{tuple(member_ids)}' "
+        cmd = f"UPDATE coins SET coin_count = coin_count + {coin_amount} WHERE discord_id IN {tuple(member_ids)} "
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
         self.db_handler.complete_transaction(cursor=cur)
 
     def get_member_coins(self, member: discord.Member):
-        self.create_member_entry_if_necessary(member=member)
+        self.create_member_entry_if_necessary(member_id=member.id)
         cmd = f"SELECT coin_count from coins WHERE discord_id = '{member.id}'"
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
