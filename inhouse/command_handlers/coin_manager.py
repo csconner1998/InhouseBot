@@ -17,7 +17,7 @@ class CoinManager(object):
         for member_id in member_ids:
             self.create_member_entry_if_necessary(member_id=member_id)
 
-        cmd = f"UPDATE coins SET coin_count = coin_count + {coin_amount} WHERE discord_id IN '{tuple(member_ids)}' "
+        cmd = f"UPDATE coins SET coin_count = coin_count + {coin_amount} WHERE discord_id IN {tuple(member_ids)}"
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
         self.db_handler.complete_transaction(cursor=cur)
