@@ -18,7 +18,7 @@ class DatabaseHandler:
 
     async def get_names(self):
         cur = self.get_cursor()
-        cmd = "SELECT name FROM players where show_rank = 'true';"
+        cmd = "SELECT name FROM players where show_rank = 'false';"
         cur.execute(cmd)
         retList = cur.fetchall()
         return retList
