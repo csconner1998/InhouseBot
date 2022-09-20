@@ -183,7 +183,7 @@ async def set_soloque_channel(ctx, channel: discord.TextChannel):
         await ctx.respond("Soloqueue Channel reset.")
         return
     solo_queue_leaderboard = Soloqueue_Leaderboard(db_handler=db_handler, channel=channel, region=my_region)
-    await ctx.respond("Set channel and set timer for soloqueue leaderboard")
+    await ctx.respond("Channel and timer set for soloqueue leaderboard")
     emojiList = ctx.guild.emojis
     solo_queue_leaderboard.make.start(emojiList)
 

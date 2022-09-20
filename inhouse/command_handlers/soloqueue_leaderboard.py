@@ -8,16 +8,7 @@ import time
 
 class Soloqueue_Leaderboard(object):
     def __init__(self, db_handler, channel: discord.TextChannel, region: str) -> None:
-        self.challenger_dict = {"I":[]}
-        self.grandmaster_dict = {"I":[]}
-        self.master_dict = {"I":[]}
-        self.diamond_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.platinum_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.gold_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.silver_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.bronze_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.iron_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.unranked_dict = []
+        self.clearDicts()
         self.channel = channel
         self.db_handler = db_handler
         self.my_region = region
@@ -249,7 +240,7 @@ class Soloqueue_Leaderboard(object):
             msg.add_field(name="Games in Past Week", value=num_string, inline=True)
             msg_list.append(msg)
         return msg_list
-    @tasks.loop(hours=3)
+    @tasks.loop(hours=inhouse.constants.solo_queue_leaderboard_loop_timer)
     async def make(self, emojiList):
         print("Making soloqueue leaderboard")
         self.clearDicts()
@@ -287,7 +278,7 @@ class Soloqueue_Leaderboard(object):
             response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner_name=name) 
             puuid = response['puuid']
             # subtract number of seconds in a week to get a week ago epoch time
-            week_ago = int(time.time() - 604800)
+            week_ago = int(time.time() - inhouse.constants.seconds_in_week)
             #queue type 420 is "solo queue" according to riot API documentation (lol)
             response = inhouse.global_objects.watcher.match.matchlist_by_puuid(self.my_region,puuid=puuid,start_time=week_ago,queue=420,count=100)
             return len(response)
