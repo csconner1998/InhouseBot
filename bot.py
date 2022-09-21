@@ -313,10 +313,15 @@ async def match_history(ctx, count: int):
 
 @bot.slash_command(description="Opt in or out of soloqueue leaderboard")
 async def show_rank(ctx, opt: bool):
-    await db_handler.set_show_rank(opt,ctx.author.id)
+    await db_handler.set_show_rank(ctx.author.id,ctx.author.display_name,opt)
     await ctx.respond("Updated")
 
-
+# Used to backfill the players who already used /show_rank
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only. Force Opt in or out of soloqueue leaderboard")
+async def force_show_rank(ctx, name: str, discord_id: str, opt: bool):
+    await db_handler.set_show_rank(discord_id,name,opt)
+    await ctx.respond("Updated")
 
 # Set players nickname with Summoner Name
 @bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")

@@ -18,14 +18,17 @@ class DatabaseHandler:
 
     async def get_names(self):
         cur = self.get_cursor()
-        cmd = "SELECT name FROM players where show_rank = 'true';"
+        cmd = "SELECT league_name FROM soloqueue_leaderboard;"
         cur.execute(cmd)
         retList = cur.fetchall()
         return retList
 
-    async def set_show_rank(self,opt,id):
+    async def set_show_rank(self,id,name,opt):
         cur = self.get_cursor()
-        cmd = f"update players set show_rank = '{opt}' where id = '{id}';"
+        if opt:
+            cmd = f"INSERT into soloqueue_leaderboard(discord_id,league_name) VALUES ('{id}', '{name}');"
+        else:
+            cmd = f"DELETE FROM soloqueue_leaderboard WHERE discord_id = '{id}'"
         cur.execute(cmd)
         self.complete_transaction(cur)
         

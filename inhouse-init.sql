@@ -136,6 +136,12 @@ CREATE TABLE "public"."coins" (
 );
 ALTER TABLE public.roles OWNER TO utahesports;
 
+CREATE TABLE "public"."soloqueue_leaderboard" (
+    "discord_id" bigint NOT NULL,
+    "league_name" "text" NOT NULL
+);
+ALTER TABLE public.roles OWNER TO utahesports;
+
 -- Sequence ID setip
 
 ALTER TABLE ONLY "public"."active_matches" ALTER COLUMN "active_id" SET DEFAULT "nextval"('"public"."active_matches_active_id_seq"'::"regclass");
