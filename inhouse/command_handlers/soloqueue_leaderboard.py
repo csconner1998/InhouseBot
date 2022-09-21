@@ -45,12 +45,13 @@ class Soloqueue_Leaderboard(object):
         ironEmoji = get(emojiList, name="Iron")
         unratedEmoji = get(emojiList, name="Unranked")
         greenTriangleEmoji = get(emojiList, name="GreenTriangle")
+        redTriangleEmoji = get(emojiList, name="RedTriangle")
         emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
         for name, tier, rank, lp, calc_lp, last_lp in sorted(self.player_list, key = itemgetter(4), reverse=True):
             if last_lp != None:
                 lp_diff = calc_lp - last_lp
                 if lp_diff < 0:
-                    lp_diff = f":small_red_triangle_down:{(0-lp_diff)}"
+                    lp_diff = f"{redTriangleEmoji}{(0-lp_diff)}"
                 else:
                     lp_diff = f"{greenTriangleEmoji}{lp_diff}"
             else:
@@ -142,7 +143,7 @@ class JoinButtons(discord.ui.View): # Create a class called MyView that subclass
     def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):
         super().__init__()
         self.db_handler = db_handler
-        
+
     @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
     async def show_rank(self, button, interaction):
         print("Add to DB")
