@@ -97,8 +97,7 @@ CREATE TABLE "public"."players" (
     "name" character varying(50) NOT NULL,
     "win" integer NOT NULL,
     "loss" integer NOT NULL,
-    "sp" integer NOT NULL,
-    "show_rank" boolean
+    "sp" integer NOT NULL
 );
 ALTER TABLE public.players OWNER TO utahesports;
 CREATE SEQUENCE "public"."players_id_seq"

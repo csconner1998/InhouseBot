@@ -49,9 +49,6 @@ bot = discord.Bot(debug_guilds=[test_guild_id])
 bot.intents.reactions = True
 bot.intents.members = True
 
-main_leaderboard: Leaderboard = None
-solo_queue_leaderboard: Leaderboard = None
-
 my_region = 'na1'
 
 @bot.event
@@ -171,7 +168,7 @@ async def set_leaderboard_channel(ctx, channel: discord.TextChannel):
     await ctx.respond("Leaderboard channel updated.")
 
 @commands.has_role("Staff")
-@bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
+@bot.slash_command(description="Staff only command. Sets the soloque leaderboard output channel.")
 async def refresh_soloque_channel(ctx: discord.ApplicationContext):
     global solo_queue_leaderboard
     if solo_queue_leaderboard == None:
@@ -180,6 +177,7 @@ async def refresh_soloque_channel(ctx: discord.ApplicationContext):
     await ctx.respond("Refreshing leaderboard")
     emojiList = ctx.guild.emojis
     await solo_queue_leaderboard.make(emojiList)
+
 # Set Soloque Leaderboard Channel
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the soloqueue leaderboard output channel.")
