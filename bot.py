@@ -170,10 +170,20 @@ async def set_leaderboard_channel(ctx, channel: discord.TextChannel):
     main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
     await ctx.respond("Leaderboard channel updated.")
 
-# Set Soloque Leaderboard Channel
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
-async def set_soloque_channel(ctx, channel: discord.TextChannel):
+async def refresh_soloque_channel(ctx: discord.ApplicationContext):
+    global solo_queue_leaderboard
+    if solo_queue_leaderboard == None:
+        await ctx.respond("Channel not found. Send as a #channel.")
+        return
+    await ctx.respond("Refreshing leaderboard")
+    emojiList = ctx.guild.emojis
+    solo_queue_leaderboard.make(emojiList)
+# Set Soloque Leaderboard Channel
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only command. Sets the soloqueue leaderboard output channel.")
+async def set_soloque_channel(ctx: discord.ApplicationContext, channel: discord.TextChannel):
     if channel == None:
         await ctx.respond("Channel not found. Send as a #channel.")
         return
