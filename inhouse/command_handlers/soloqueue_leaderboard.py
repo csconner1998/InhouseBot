@@ -44,6 +44,7 @@ class Soloqueue_Leaderboard(object):
         bronzeEmoji = get(emojiList, name="Bronze")
         ironEmoji = get(emojiList, name="Iron")
         unratedEmoji = get(emojiList, name="Unranked")
+        greenTriangleEmoji = get(emojiList, name="GreenTriangle")
         emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
         for name, tier, rank, lp, calc_lp, last_lp in sorted(self.player_list, key = itemgetter(4), reverse=True):
             if last_lp != None:
@@ -51,9 +52,9 @@ class Soloqueue_Leaderboard(object):
                 if lp_diff < 0:
                     lp_diff = f":small_red_triangle_down:{(0-lp_diff)}"
                 else:
-                    lp_diff = f":small_red_triangle:{lp_diff}"
+                    lp_diff = f"{greenTriangleEmoji}{lp_diff}"
             else:
-                lp_diff = ":small_red_triangle: 0"
+                lp_diff = f"{greenTriangleEmoji} 0"
             name_string += f"{emojiMap[tier]} {name}\n"
             rank_string += f"{tier} {rank} {lp} LP\n"     
             num_string += f"{self.num_ranked_past_week(name)} ({lp_diff} LP)\n"
@@ -118,7 +119,7 @@ class Soloqueue_Leaderboard(object):
             await self.channel.send(embed=msg)
         
 
-        await self.channel.send("Please use /show_rank to join leaderboard. <#1021446812177006682>",view=JoinButtons(self.db_handler))
+        await self.channel.send(view=JoinButtons(self.db_handler))
 
     def num_ranked_past_week(self, name: str):
         try:
@@ -141,15 +142,15 @@ class JoinButtons(discord.ui.View): # Create a class called MyView that subclass
     def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):
         super().__init__()
         self.db_handler = db_handler
+        
     @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
     async def show_rank(self, button, interaction):
         print("Add to DB")
         await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name,True)
-        await interaction.response.send_message("Added", ephemeral=True)
-
+        await interaction.response.send_message("Added. You will now show up on next leaderboard reset.", ephemeral=True)
 
     @discord.ui.button(label="Hide Rank", style=discord.ButtonStyle.red)
     async def not_show_rank(self, button, interaction):
         print("Remove from DB")
         await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name,False)
-        await interaction.response.send_message("Removed", ephemeral=True)
+        await interaction.response.send_message("Removed. You will no longer show up on next leaderboard reset.", ephemeral=True)
