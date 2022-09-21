@@ -101,6 +101,10 @@ class Soloqueue_Leaderboard(object):
                         break
                     else:
                         pass
+                if playerRank == "":
+                    playerRank == "UNRANKED"
+                    tier = "UNRANKED"
+                    lp = 0
                 self.add_player(name,tier,playerRank,lp,last_lp)
                 # if weekday is 0 (monday) and the hour of now is 8 (8am) reset the weeks LP
                 if datetime.now().weekday() == 0 and datetime.now().hour == 8:
