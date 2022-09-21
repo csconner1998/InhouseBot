@@ -49,6 +49,9 @@ bot = discord.Bot(debug_guilds=[test_guild_id])
 bot.intents.reactions = True
 bot.intents.members = True
 
+main_leaderboard: Leaderboard = None
+solo_queue_leaderboard: Leaderboard = None
+
 my_region = 'na1'
 
 @bot.event
@@ -307,12 +310,6 @@ async def match_history(ctx, count: int):
     res = await ctx.respond("Getting match history...")
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
-
-
-@bot.slash_command(description="Opt in or out of soloqueue leaderboard")
-async def show_rank(ctx, opt: bool):
-    await db_handler.set_show_rank(ctx.author.id,ctx.author.display_name,opt)
-    await ctx.respond("Updated")
 
 # Used to backfill the players who already used /show_rank
 @commands.has_role("Staff")

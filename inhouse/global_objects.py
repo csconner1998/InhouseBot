@@ -1,8 +1,6 @@
 from riotwatcher import LolWatcher, ApiError
 from inhouse.command_handlers.coin_manager import CoinManager
 from inhouse.command_handlers.queue import *
-from inhouse.command_handlers.soloqueue_leaderboard import *
-from inhouse.command_handlers.leaderboard import *
 
 class RolesHolder():
     def __init__(self, competitive_inhouse: discord.Role, casual_inhouse: discord.Role, normals: discord.Role, flex: discord.Role, aram: discord.Role, rgm: discord.Role) -> None:
@@ -19,5 +17,3 @@ server_roles: RolesHolder = None
 main_queue: Queue = None
 watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
 coin_manager: CoinManager = None
-main_leaderboard: Leaderboard = None
-solo_queue_leaderboard: Soloqueue_Leaderboard = None

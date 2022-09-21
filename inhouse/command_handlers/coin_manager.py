@@ -1,4 +1,3 @@
-from urllib.request import DataHandler
 import discord
 import inhouse.db_util
 
