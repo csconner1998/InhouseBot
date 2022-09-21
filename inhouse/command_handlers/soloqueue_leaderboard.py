@@ -272,7 +272,7 @@ class Soloqueue_Leaderboard(object):
         msgs = self.get_embbeded(emojiList)
         for msg in msgs:
             await self.channel.send(embed=msg)
-        await self.channel.send("Please use /show_rank to join leaderboard")
+        await self.channel.send("Please use /show_rank to join leaderboard. <#1021446812177006682>")
     def num_ranked_past_week(self, name: str):
         try:
             response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner_name=name) 
