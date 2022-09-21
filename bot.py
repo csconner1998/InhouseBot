@@ -5,7 +5,7 @@ import os
 from inhouse.command_handlers.causal_modes import CasualModePicker, active_players_set
 from inhouse.command_handlers.coin_manager import CoinManager
 from inhouse.command_handlers.player import Player
-from riotwatcher import LolWatcher, ApiError
+from riotwatcher import ApiError
 
 # TODO: logger rather than prints
 
@@ -50,6 +50,7 @@ bot.intents.reactions = True
 bot.intents.members = True
 
 main_leaderboard: Leaderboard = None
+solo_queue_leaderboard: Leaderboard = None
 
 my_region = 'na1'
 
@@ -168,6 +169,23 @@ async def set_leaderboard_channel(ctx, channel: discord.TextChannel):
     global main_leaderboard
     main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
     await ctx.respond("Leaderboard channel updated.")
+
+# Set Soloque Leaderboard Channel
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
+async def set_soloque_channel(ctx, channel: discord.TextChannel):
+    if channel == None:
+        await ctx.respond("Channel not found. Send as a #channel.")
+        return
+    global solo_queue_leaderboard
+    if solo_queue_leaderboard != None:
+        solo_queue_leaderboard.channel = channel
+        await ctx.respond("Soloqueue Channel reset.")
+        return
+    solo_queue_leaderboard = Soloqueue_Leaderboard(db_handler=db_handler, channel=channel, region=my_region)
+    await ctx.respond("Channel and timer set for soloqueue leaderboard")
+    emojiList = ctx.guild.emojis
+    solo_queue_leaderboard.make.start(emojiList)
 
 # Set roles
 @commands.has_role("Staff")
@@ -288,38 +306,6 @@ async def show_rank(ctx, opt: bool):
     await db_handler.set_show_rank(opt,ctx.author.id)
     await ctx.respond("Updated")
 
-# Cooldown is once per 5 minutes to prevent spam
-@commands.cooldown(rate=1, per=300)
-@bot.slash_command(description="Shows soloqueue leaderboard")
-async def soloqueue(ctx):
-    res = await ctx.respond("Getting soloqueue leaderboard...")
-    names = await db_handler.get_names()
-    player_dict = Soloqueue_Leaderboard()
-    for summoner in names:
-        try:
-            response = inhouse.global_objects.watcher.summoner.by_name(my_region,summoner[0]) 
-            id = response["id"]
-            name = response["name"]
-            rank = inhouse.global_objects.watcher.league.by_summoner(my_region,id)
-            rankStr = ""
-            for types in rank:
-                if types["queueType"] == solo_queue:
-                    tier = types["tier"]
-                    playerRank = types["rank"]
-                    lp = types["leaguePoints"]
-                    break
-                else:
-                    pass
-            if rankStr == "":
-                tier = types["tier"]
-                playerRank = types["rank"]
-            player_dict.add_player(name,tier,playerRank,lp)
-        except Exception as e:
-            print(e)
-    await res.delete_original_message()
-    print_msgs = player_dict.get_embbeded()
-    for msg in print_msgs:
-        await ctx.send(embed=msg)
 
 
 # Set players nickname with Summoner Name
