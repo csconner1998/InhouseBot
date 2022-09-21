@@ -179,7 +179,7 @@ async def refresh_soloque_channel(ctx: discord.ApplicationContext):
         return
     await ctx.respond("Refreshing leaderboard")
     emojiList = ctx.guild.emojis
-    solo_queue_leaderboard.make(emojiList)
+    await solo_queue_leaderboard.make(emojiList)
 # Set Soloque Leaderboard Channel
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the soloqueue leaderboard output channel.")
