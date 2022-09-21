@@ -250,8 +250,6 @@ class Soloqueue_Leaderboard(object):
                 response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner[0]) 
                 id = response["id"]
                 name = response["name"]
-                if name == "Jayms":
-                    print("here")
                 rank = inhouse.global_objects.watcher.league.by_summoner(self.my_region,id)
                 playerRank = ""
                 lp = 0
