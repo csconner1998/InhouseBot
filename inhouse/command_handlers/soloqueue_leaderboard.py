@@ -129,6 +129,8 @@ class Soloqueue_Leaderboard(object):
                 print(e)
 
     def calc_lp(self,tier,div,lp):
+        if tier == "UNRANKED":
+            return 0
         return (100 * self.divMap[div]) + (400 * self.tierMap[tier]) + int(lp)
 
 class JoinButtons(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
