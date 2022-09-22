@@ -1,5 +1,3 @@
-from gc import callbacks
-from tkinter import Label
 import discord
 from discord.utils import get
 from discord.ext import tasks

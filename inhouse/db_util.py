@@ -1,4 +1,3 @@
-from genericpath import exists
 import psycopg2 
 import discord
 
