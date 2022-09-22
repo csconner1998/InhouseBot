@@ -28,7 +28,7 @@ class DatabaseHandler:
         cmd = f"SELECT discord_id FROM soloqueue_leaderboard where discord_id = {id};"
         cur.execute(cmd)
         exists = cur.fetchone()
-        if exists:
+        if exists and (not opt):
             return
         if opt:
             cmd = f"INSERT into soloqueue_leaderboard(discord_id,league_name) VALUES ('{id}', '{name}');"
