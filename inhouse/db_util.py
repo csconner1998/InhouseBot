@@ -18,17 +18,31 @@ class DatabaseHandler:
 
     async def get_names(self):
         cur = self.get_cursor()
-        cmd = "SELECT name FROM players where show_rank = 'true';"
+        cmd = "SELECT league_name, discord_id, last_lp FROM soloqueue_leaderboard;"
         cur.execute(cmd)
         retList = cur.fetchall()
         return retList
 
-    async def set_show_rank(self,opt,id):
+    async def set_show_rank(self,id,name,opt):
         cur = self.get_cursor()
-        cmd = f"update players set show_rank = '{opt}' where id = '{id}';"
+        cmd = f"SELECT discord_id FROM soloqueue_leaderboard where discord_id = {id};"
+        cur.execute(cmd)
+        exists = cur.fetchone()
+        if exists:
+            return
+        if opt:
+            cmd = f"INSERT into soloqueue_leaderboard(discord_id,league_name) VALUES ('{id}', '{name}');"
+        else:
+            cmd = f"DELETE FROM soloqueue_leaderboard WHERE discord_id = '{id}'"
         cur.execute(cmd)
         self.complete_transaction(cur)
-        
+    
+    async def set_week_lp(self,id,lp):
+        cur = self.get_cursor()
+        cmd = f"UPDATE soloqueue_leaderboard SET last_lp = '{lp}' WHERE discord_id = '{id}'"
+        cur.execute(cmd)
+        self.complete_transaction(cur)
+
     async def get_match_history(self, ctx, count):
         cur = self.get_cursor()
         cmd = f"SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit {count*10};"

@@ -5,47 +5,26 @@ from operator import itemgetter
 import inhouse.constants
 import inhouse.global_objects
 import time
+from datetime import datetime
+import inhouse.db_util
 
 class Soloqueue_Leaderboard(object):
-    def __init__(self, db_handler, channel: discord.TextChannel, region: str) -> None:
-        self.clearDicts()
+    def __init__(self, db_handler: inhouse.db_util.DatabaseHandler, channel: discord.TextChannel, region: str) -> None:
+        self.clearDict()
         self.channel = channel
         self.db_handler = db_handler
         self.my_region = region
+        self.tierMap = {"IRON" : 0, "BRONZE" : 1, "SILVER" : 2, "GOLD" : 3, "PLATINUM" : 4, "DIAMOND" : 5, "MASTER" : 6, "GRANDMASTER" : 6, "CHALLENGER" : 6}
+        self.divMap = {"IV" : 0, "III" : 1, "II": 2, "I" : 3}
     
-    def clearDicts(self):
-        self.challenger_dict = {"I":[]}
-        self.grandmaster_dict = {"I":[]}
-        self.master_dict = {"I":[]}
-        self.diamond_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.platinum_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.gold_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.silver_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.bronze_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.iron_dict = {"I":[],"II":[],"III":[],"IV":[]}
-        self.unranked_dict = []
+    def clearDict(self):
+        self.player_list=[]
 
-    def add_player(self,name,tier,rank,lp):
-        if tier == "CHALLENGER":
-            self.challenger_dict[rank].append((name, lp))
-        elif tier == "GRANDMASTER":
-            self.grandmaster_dict[rank].append((name, lp))
-        elif tier == "MASTER":
-            self.master_dict[rank].append((name, lp))
-        elif tier == "DIAMOND":
-            self.diamond_dict[rank].append((name, lp))
-        elif tier == "PLATINUM":
-            self.platinum_dict[rank].append((name, lp))
-        elif tier == "GOLD":
-            self.gold_dict[rank].append((name, lp))
-        elif tier == "SILVER":
-            self.silver_dict[rank].append((name, lp))
-        elif tier == "BRONZE":
-            self.bronze_dict[rank].append((name, lp))
-        elif tier == "IRON":
-            self.iron_dict[rank].append((name, lp))
-        else:
-            self.unranked_dict.append((name, lp))
+    def add_player(self,name,tier,rank,lp,last_lp):
+        calc_lp = self.calc_lp(tier,rank,lp)
+        player_obj = (name, tier, rank, lp, calc_lp,last_lp)
+        self.player_list.append(player_obj)
+
     def get_embbeded(self, emojiList):
         msg_list = []
         i = 0
@@ -63,164 +42,22 @@ class Soloqueue_Leaderboard(object):
         bronzeEmoji = get(emojiList, name="Bronze")
         ironEmoji = get(emojiList, name="Iron")
         unratedEmoji = get(emojiList, name="Unranked")
-        for rank in self.challenger_dict:
-            for player in sorted(self.challenger_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{challengerEmoji} {player[0]}\n"
-                rank_string += f"Challenger {rank} {str(player[1])} LP\n"     
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
+        greenTriangleEmoji = get(emojiList, name="GreenTriangle")
+        redTriangleEmoji = get(emojiList, name="RedTriangle")
+        emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
+        for name, tier, rank, lp, calc_lp, last_lp in sorted(self.player_list, key = itemgetter(4), reverse=True):
+            if last_lp != None:
+                lp_diff = calc_lp - last_lp
+                if lp_diff < 0:
+                    lp_diff = f"{redTriangleEmoji}{(0-lp_diff)}"
+                else:
+                    lp_diff = f"{greenTriangleEmoji}{lp_diff}"
+            else:
+                lp_diff = f"{greenTriangleEmoji} 0"
+            name_string += f"{emojiMap[tier]} {name}\n"
+            rank_string += f"{tier} {rank} {lp} LP\n"     
+            num_string += f"{self.num_ranked_past_week(name)} ({lp_diff} LP)\n"
 
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.grandmaster_dict:
-            for player in sorted(self.grandmaster_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{grandmasterEmoji} {player[0]}\n"
-                rank_string += f"Grandmaster {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.master_dict:
-            for player in sorted(self.master_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{masterEmoji} {player[0]}\n"
-                rank_string += f"Master {rank} {str(player[1])} LP\n"
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.diamond_dict:
-            for player in sorted(self.diamond_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{diamondEmoji} {player[0]}\n"
-                rank_string += f"Diamond {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.platinum_dict:
-            for player in sorted(self.platinum_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{platinumEmoji} {player[0]}\n"
-                rank_string += f"Platinum {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.gold_dict:
-            for player in sorted(self.gold_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{goldEmoji} {player[0]}\n"
-                rank_string += f"Gold {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.silver_dict:
-            for player in sorted(self.silver_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{silverEmoji} {player[0]}\n"
-                rank_string += f"Silver {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.bronze_dict:
-            for player in sorted(self.bronze_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{bronzeEmoji} {player[0]}\n"
-                rank_string += f"Bronze {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for rank in self.iron_dict:
-            for player in sorted(self.iron_dict[rank], key = itemgetter(1), reverse=True):
-                name_string += f"{ironEmoji} {player[0]}\n"
-                rank_string += f"Iron {rank} {str(player[1])} LP\n"                
-                num_string += f"{self.num_ranked_past_week(player[0])}\n"
-                i += 1
-                if i % 10 == 0:
-                    msg = discord.Embed(color=discord.Color.blue())
-                    if i == 10:
-                        msg.title = ":trophy: **Soloqueue Standings** :trophy:"
-                    msg.add_field(name="Summoner", value=name_string, inline=True)
-                    msg.add_field(name="Rank", value=rank_string, inline=True)
-                    msg.add_field(name="Games in Past Week", value=num_string, inline=True)
-                    msg_list.append(msg)
-                    rank_string = ""
-                    name_string = ""
-                    num_string = ""
-        for player in self.unranked_dict:
-            name_string += f"{unratedEmoji} {player[0]}\n"
-            rank_string += f"Unranked\n"
-            num_string += f"{self.num_ranked_past_week(player[0])}\n"
             i += 1
             if i % 10 == 0:
                 msg = discord.Embed(color=discord.Color.blue())
@@ -240,21 +77,21 @@ class Soloqueue_Leaderboard(object):
             msg.add_field(name="Games in Past Week", value=num_string, inline=True)
             msg_list.append(msg)
         return msg_list
+        
     @tasks.loop(hours=inhouse.constants.solo_queue_leaderboard_loop_timer)
     async def make(self, emojiList):
         print("Making soloqueue leaderboard")
-        self.clearDicts()
+        self.clearDict()
         names = await self.db_handler.get_names()
         for summoner in names:
             try:
                 response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner[0]) 
                 id = response["id"]
                 name = response["name"]
-                if name == "Jayms":
-                    print("here")
                 rank = inhouse.global_objects.watcher.league.by_summoner(self.my_region,id)
                 playerRank = ""
                 lp = 0
+                last_lp = summoner[2]
                 tier = ""
                 for types in rank:
                     if types["queueType"] == inhouse.constants.solo_queue:
@@ -264,7 +101,14 @@ class Soloqueue_Leaderboard(object):
                         break
                     else:
                         pass
-                self.add_player(name,tier,playerRank,lp)
+                if playerRank == "":
+                    playerRank == "UNRANKED"
+                    tier = "UNRANKED"
+                    lp = 0
+                self.add_player(name,tier,playerRank,lp,last_lp)
+                # if weekday is 0 (monday) and the hour of now is 8 (8am) reset the weeks LP
+                if datetime.now().weekday() == 0 and datetime.now().hour == 8:
+                    await self.db_handler.set_week_lp(summoner[1],self.calc_lp(tier=tier,div=playerRank,lp=lp))
             except Exception as e:
                 print(e)
         async for message in self.channel.history(limit=50):
@@ -272,7 +116,10 @@ class Soloqueue_Leaderboard(object):
         msgs = self.get_embbeded(emojiList)
         for msg in msgs:
             await self.channel.send(embed=msg)
-        await self.channel.send("Please use /show_rank to join leaderboard")
+        
+
+        await self.channel.send(view=JoinButtons(self.db_handler))
+
     def num_ranked_past_week(self, name: str):
         try:
             response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner_name=name) 
@@ -284,4 +131,25 @@ class Soloqueue_Leaderboard(object):
             return len(response)
         except Exception as e:
                 print(e)
-        
+
+    def calc_lp(self,tier,div,lp):
+        if tier == "UNRANKED":
+            return 0
+        return (100 * self.divMap[div]) + (400 * self.tierMap[tier]) + int(lp)
+
+class JoinButtons(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
+    def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):
+        super().__init__()
+        self.db_handler = db_handler
+
+    @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
+    async def show_rank(self, button, interaction):
+        print("Add to DB")
+        await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name,True)
+        await interaction.response.send_message("Added. You will now show up on next leaderboard reset.", ephemeral=True)
+
+    @discord.ui.button(label="Hide Rank", style=discord.ButtonStyle.red)
+    async def not_show_rank(self, button, interaction):
+        print("Remove from DB")
+        await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name,False)
+        await interaction.response.send_message("Removed. You will no longer show up on next leaderboard reset.", ephemeral=True)

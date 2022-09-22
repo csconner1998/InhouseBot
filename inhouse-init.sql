@@ -135,6 +135,14 @@ CREATE TABLE "public"."coins" (
 );
 ALTER TABLE public.roles OWNER TO utahesports;
 
+-- Soloqueue Leaderboard
+CREATE TABLE "public"."soloqueue_leaderboard" (
+    "discord_id" bigint NOT NULL,
+    "league_name" "text" NOT NULL,
+    "last_lp" integer
+);
+ALTER TABLE public.roles OWNER TO utahesports;
+
 -- Sequence ID setip
 
 ALTER TABLE ONLY "public"."active_matches" ALTER COLUMN "active_id" SET DEFAULT "nextval"('"public"."active_matches_active_id_seq"'::"regclass");
@@ -179,6 +187,8 @@ ALTER TABLE ONLY "public"."roles"
 
 ALTER TABLE ONLY "public"."coins"
     ADD CONSTRAINT "coins_pkey" PRIMARY KEY ("discord_id");
+ALTER TABLE ONLY "public"."soloqueue_leaderboard"
+    ADD CONSTRAINT "soloqueue_leaderboard_pkey" PRIMARY KEY ("discord_id");
 
 -- FKs
 

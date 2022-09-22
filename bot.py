@@ -170,10 +170,21 @@ async def set_leaderboard_channel(ctx, channel: discord.TextChannel):
     main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
     await ctx.respond("Leaderboard channel updated.")
 
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only command. Sets the soloque leaderboard output channel.")
+async def refresh_soloque_channel(ctx: discord.ApplicationContext):
+    global solo_queue_leaderboard
+    if solo_queue_leaderboard == None:
+        await ctx.respond("Channel not found. Send as a #channel.")
+        return
+    await ctx.respond("Refreshing leaderboard")
+    emojiList = ctx.guild.emojis
+    await solo_queue_leaderboard.make(emojiList)
+
 # Set Soloque Leaderboard Channel
 @commands.has_role("Staff")
-@bot.slash_command(description="Staff only command. Sets the leaderboard output channel.")
-async def set_soloque_channel(ctx, channel: discord.TextChannel):
+@bot.slash_command(description="Staff only command. Sets the soloqueue leaderboard output channel.")
+async def set_soloque_channel(ctx: discord.ApplicationContext, channel: discord.TextChannel):
     if channel == None:
         await ctx.respond("Channel not found. Send as a #channel.")
         return
@@ -300,13 +311,12 @@ async def match_history(ctx, count: int):
     await db_handler.get_match_history(ctx=ctx, count=count)
     await res.delete_original_message()
 
-
-@bot.slash_command(description="Opt in or out of soloqueue leaderboard")
-async def show_rank(ctx, opt: bool):
-    await db_handler.set_show_rank(opt,ctx.author.id)
+# Used to backfill the players who already used /show_rank
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only. Force Opt in or out of soloqueue leaderboard")
+async def force_show_rank(ctx, name: str, discord_id: str, opt: bool):
+    await db_handler.set_show_rank(discord_id,name,opt)
     await ctx.respond("Updated")
-
-
 
 # Set players nickname with Summoner Name
 @bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
