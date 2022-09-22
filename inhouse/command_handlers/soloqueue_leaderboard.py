@@ -136,8 +136,8 @@ class Soloqueue_Leaderboard(object):
         return (100 * self.divMap[div]) + (400 * self.tierMap[tier]) + int(lp)
 
 class JoinButtons(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
-    def __init__(self, db_handler: inhouse.db_util.DatabaseHandler, timeout=180):
-        super().__init__(timeout=timeout)
+    def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):
+        super().__init__(timeout=None)
         self.db_handler = db_handler
 
     @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
