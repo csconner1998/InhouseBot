@@ -70,7 +70,7 @@ class Soloqueue_Leaderboard(object):
                 rank_string = ""
                 name_string = ""
                 num_string = ""
-        if i != 0:
+        if i % 10 != 0:
             msg = discord.Embed(color=discord.Color.blue())
             msg.add_field(name="Summoner", value=name_string, inline=True)
             msg.add_field(name="Rank", value=rank_string, inline=True)
@@ -116,8 +116,6 @@ class Soloqueue_Leaderboard(object):
         msgs = self.get_embbeded(emojiList)
         for msg in msgs:
             await self.channel.send(embed=msg)
-        
-
         await self.channel.send(view=JoinButtons(self.db_handler))
 
     def num_ranked_past_week(self, name: str):
@@ -138,8 +136,8 @@ class Soloqueue_Leaderboard(object):
         return (100 * self.divMap[div]) + (400 * self.tierMap[tier]) + int(lp)
 
 class JoinButtons(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
-    def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):
-        super().__init__()
+    def __init__(self, db_handler: inhouse.db_util.DatabaseHandler, timeout=180):
+        super().__init__(timeout=timeout)
         self.db_handler = db_handler
 
     @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
