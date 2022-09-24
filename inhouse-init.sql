@@ -139,7 +139,9 @@ ALTER TABLE public.roles OWNER TO utahesports;
 CREATE TABLE "public"."soloqueue_leaderboard" (
     "discord_id" bigint NOT NULL,
     "league_name" "text" NOT NULL,
-    "last_lp" integer
+    "last_lp" integer,
+    "sum_id" text,
+    "puuid" text
 );
 ALTER TABLE public.roles OWNER TO utahesports;
 

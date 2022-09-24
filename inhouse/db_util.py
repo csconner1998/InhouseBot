@@ -18,12 +18,25 @@ class DatabaseHandler:
 
     async def get_names(self):
         cur = self.get_cursor()
-        cmd = "SELECT league_name, discord_id, last_lp FROM soloqueue_leaderboard;"
+        cmd = "SELECT league_name, discord_id, last_lp, puuid, sum_id FROM soloqueue_leaderboard;"
         cur.execute(cmd)
         retList = cur.fetchall()
         return retList
 
-    async def set_show_rank(self,id,name,opt):
+    async def get_missing_names(self):
+        cur = self.get_cursor()
+        cmd = "SELECT discord_id, league_name FROM soloqueue_leaderboard where puuid is NULL;"
+        cur.execute(cmd)
+        retList = cur.fetchall()
+        return retList
+    async def delete_missing_puuid(self):
+        cur = self.get_cursor()
+        cmd = "DELETE FROM soloqueue_leaderboard where puuid is NULL;"
+        cur.execute(cmd)
+        retList = cur.fetchall()
+        return retList
+
+    async def set_show_rank(self,id,name,opt,sumID=None,puuid=None):
         cur = self.get_cursor()
         cmd = f"SELECT discord_id FROM soloqueue_leaderboard where discord_id = {id};"
         cur.execute(cmd)
@@ -31,12 +44,18 @@ class DatabaseHandler:
         if exists and (not opt):
             return
         if opt:
-            cmd = f"INSERT into soloqueue_leaderboard(discord_id,league_name) VALUES ('{id}', '{name}');"
+            cmd = f"INSERT into soloqueue_leaderboard(discord_id,league_name,puuid,sum_id) VALUES ('{id}', '{name}', '{puuid}','{sumID}');"
         else:
             cmd = f"DELETE FROM soloqueue_leaderboard WHERE discord_id = '{id}'"
         cur.execute(cmd)
         self.complete_transaction(cur)
     
+    async def update_sum_ids(self,disc_id, sum_id, puuid):
+        cur = self.get_cursor()
+        cmd = f"UPDATE soloqueue_leaderboard SET sum_id = '{sum_id}', puuid = '{puuid}'  WHERE discord_id = '{disc_id}'"
+        cur.execute(cmd)
+        self.complete_transaction(cur)
+        
     async def set_week_lp(self,id,lp):
         cur = self.get_cursor()
         cmd = f"UPDATE soloqueue_leaderboard SET last_lp = '{lp}' WHERE discord_id = '{id}'"

@@ -48,6 +48,7 @@ move_to_channel_delay = 30
 casual_game_timeout = 21600
 seconds_in_week = 604800
 solo_queue_leaderboard_loop_timer = 1
+seconds_in_two_min = 120
 
 coins_for_casual_game = 50
 coins_for_competitive_inhouse_win = 300
