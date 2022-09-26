@@ -63,7 +63,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
     if isinstance(error, commands.CommandOnCooldown):
         await ctx.respond("This command is currently on cooldown!", ephemeral=True)
     else:
-        await ctx.respond("Something went wrong! Please try again in a few minutes. If the problem persists, reach out to Staff.")
+        await ctx.respond("Something went wrong! Please try again in a few minutes. If the problem persists, reach out to Staff.", ephemeral=True)
         # TODO: should critical log this instead of just swallowing.
         print(error) 
 
@@ -383,7 +383,7 @@ async def fancy(ctx: discord.ApplicationContext, message: str):
             await ctx.respond(embed=embed)
             inhouse.global_objects.coin_manager.update_member_coins(member=ctx.author, coin_amount=-inhouse.constants.cost_for_embed_message)
         else:
-            await ctx.respond("You don't have enough Wonkoin!", ephemeral=False)
+            await ctx.respond("You don't have enough Wonkoin!", ephemeral=True)
     except Exception as e:
         print(e)
         await ctx.respond("Something went wrong! Please try again in a few minutes or reach out to Staff.", ephemeral=True)
