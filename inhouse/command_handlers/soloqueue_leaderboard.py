@@ -7,7 +7,7 @@ import inhouse.global_objects
 import time
 from datetime import datetime
 import inhouse.db_util
-from ratelimit import limits
+from ratelimit import limits, sleep_and_retry
 
 class Soloqueue_Leaderboard(object):
     def __init__(self, db_handler: inhouse.db_util.DatabaseHandler, channel: discord.TextChannel, region: str) -> None:
@@ -79,7 +79,7 @@ class Soloqueue_Leaderboard(object):
             msg_list.append(msg)
         return msg_list
         
-    @tasks.loop(seconds=60)
+    @tasks.loop(hours=inhouse.constants.solo_queue_leaderboard_loop_timer)
     async def make(self, emojiList):
         print("Making soloqueue leaderboard")
         self.clearDict()
@@ -128,7 +128,6 @@ class Soloqueue_Leaderboard(object):
             week_ago = int(time.time() - inhouse.constants.seconds_in_week)
             #queue type 420 is "solo queue" according to riot API documentation (lol)
             response = inhouse.global_objects.watcher.match.matchlist_by_puuid(self.my_region,puuid=puuid,start_time=week_ago,queue=420,count=100)
-            time.sleep(0.05)
             return len(response)
         except Exception as e:
                 print(e)
@@ -136,6 +135,7 @@ class Soloqueue_Leaderboard(object):
     # rate limits are 20 every second and 100 every 2 min, since we are calling API twice its 10 every second and 100 every 2 minutes
     @limits(calls=10, period=1)
     @limits(calls=100, period=inhouse.constants.seconds_in_two_min)
+    @sleep_and_retry
     def api_calls(self, sum_id, puuid):
         try:
             rank = inhouse.global_objects.watcher.league.by_summoner(self.my_region,sum_id)
@@ -143,7 +143,6 @@ class Soloqueue_Leaderboard(object):
             week_ago = int(time.time() - inhouse.constants.seconds_in_week)
             #queue type 420 is "solo queue" according to riot API documentation (lol)
             response = inhouse.global_objects.watcher.match.matchlist_by_puuid(self.my_region,puuid=puuid,start_time=week_ago,queue=420,count=100)
-            time.sleep(0.05)
             return rank, len(response)
         except Exception as e:
                 print(e)
