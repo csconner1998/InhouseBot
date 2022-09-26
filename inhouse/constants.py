@@ -14,6 +14,7 @@ aram_emoji_id = 1009563351946371102
 soulrush_bot_id = 197473689263013898
 
 name_assign_channel = 1009553154305695816
+bot_spam_channel = 1021446812177006682
 bot_dev_role = 1001367008086081547
 
 inhouse_role_assign_message = 1013201403633750086

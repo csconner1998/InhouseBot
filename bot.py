@@ -226,9 +226,8 @@ async def refresh_leaderboard(ctx):
 async def add_to_db(ctx, user: discord.Member):
     try: 
         cur = db_handler.get_cursor()
-        insert_cmd = f"INSERT INTO players({inhouse.constants.new_player_db_key}) VALUES ('{user.id}', '{user.name}', '0', '0', '0', '{inhouse.constants.default_points}')"
-        cur.execute(insert_cmd)
-        db_handler.complete_transaction(cur)
+        insert_cmd = f"INSERT INTO players({inhouse.constants.new_player_db_key}) VALUES ('{user.id}', '{user.name}', '0', '0', '{inhouse.constants.default_points}')"
+        db_handler.complete_transaction(cur, [insert_cmd])
         await ctx.respond("Done.")
     except Exception as e:
         print(e)
@@ -336,10 +335,12 @@ async def fix_puuid(ctx):
     await ctx.send("Updated")
 
 # Set players nickname with Summoner Name
-@bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
+# Cooldown is once per 5 minutes to prevent spam/overloading riot API
+@commands.cooldown(rate=1, per=300)
+@bot.slash_command(description="Sets discord nickname. Please enter valid Summoner name")
 async def setname(ctx, summoner_name: str):
-    if ctx.channel_id != inhouse.constants.name_assign_channel:
-        await ctx.author.send("Can only use /setname in #name-assign. If you need to change your name, please reach out to a Staff member")
+    if not ctx.channel_id in [inhouse.constants.name_assign_channel, inhouse.constants.bot_spam_channel]:
+        await ctx.author.send(f"Can only use /setname in <#{inhouse.constants.name_assign_channel}> or <#{inhouse.constants.bot_spam_channel}>. If you need assistance, please reach out to a Staff member")
         return
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")

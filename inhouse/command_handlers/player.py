@@ -32,15 +32,10 @@ class Player(object):
             if spNum < 0:
                 spNum = 0
         cmd = f"UPDATE players SET win = '{str(winNum)}', loss = '{str(losNum)}', sp = '{str(spNum)}' where id ='{str(self.id)}';"
-        cur.execute(cmd)
-        self.db_handler.complete_transaction(cur)
+        self.db_handler.complete_transaction(cur, cmds=[cmd])
     
     def update_name(self):
         cur = self.db_handler.get_cursor()
         cmd = f"UPDATE players SET name = '{self.name}' where id ='{str(self.id)}'"
-        cur.execute(cmd)
-        self.db_handler.complete_transaction(cursor=cur)
-
-    def update_coins(self, amount: int):
-        cur = self.db_handler.get_cursor()
+        self.db_handler.complete_transaction(cursor=cur, cmds=[cmd])
     
