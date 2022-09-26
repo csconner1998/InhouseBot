@@ -362,8 +362,22 @@ async def casual(ctx: discord.ApplicationContext):
         await ctx.respond("You are already in a Lobby!")
         return
 
-    await ctx.respond("Choose the mode you'd like to play!")
+    await ctx.respond("Choose the mode you'd like to play!", ephemeral=True)
     await ctx.send("Modes:", view=CasualModePicker(timeout=30, ctx=ctx))
+
+@bot.slash_command(description=f"Send a message as a fancy embed! Costs {inhouse.constants.cost_for_embed_message} Wonkoin.")
+async def fancy(ctx: discord.ApplicationContext, message: str):
+    try:
+        if inhouse.global_objects.coin_manager.get_member_coins(ctx.author) >= inhouse.constants.cost_for_embed_message:
+            embed = discord.Embed(description=f"**{ctx.author.display_name}:** {message}", color=discord.Color.random())
+            await ctx.respond(embed=embed)
+            inhouse.global_objects.coin_manager.update_member_coins(member=ctx.author, coin_amount=-inhouse.constants.cost_for_embed_message)
+        else:
+            await ctx.respond("You don't have enough Wonkoin!", ephemeral=False)
+    except Exception as e:
+        print(e)
+        await ctx.respond("Something went wrong! Please try again in a few minutes or reach out to Staff.", ephemeral=True)
+
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
