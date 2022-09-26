@@ -7,6 +7,7 @@ import inhouse.global_objects
 import time
 from datetime import datetime
 import inhouse.db_util
+from ratelimit import limits, sleep_and_retry
 
 class Soloqueue_Leaderboard(object):
     def __init__(self, db_handler: inhouse.db_util.DatabaseHandler, channel: discord.TextChannel, region: str) -> None:
@@ -20,9 +21,9 @@ class Soloqueue_Leaderboard(object):
     def clearDict(self):
         self.player_list=[]
 
-    def add_player(self,name,tier,rank,lp,last_lp):
+    def add_player(self,name,tier,rank,lp,last_lp,num_ranked):
         calc_lp = self.calc_lp(tier,rank,lp)
-        player_obj = (name, tier, rank, lp, calc_lp,last_lp)
+        player_obj = (name, tier, rank, lp, calc_lp,last_lp,num_ranked)
         self.player_list.append(player_obj)
 
     def get_embbeded(self, emojiList):
@@ -45,7 +46,7 @@ class Soloqueue_Leaderboard(object):
         greenTriangleEmoji = get(emojiList, name="GreenTriangle")
         redTriangleEmoji = get(emojiList, name="RedTriangle")
         emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
-        for name, tier, rank, lp, calc_lp, last_lp in sorted(self.player_list, key = itemgetter(4), reverse=True):
+        for name, tier, rank, lp, calc_lp, last_lp, num_ranked in sorted(self.player_list, key = itemgetter(4), reverse=True):
             if last_lp != None:
                 lp_diff = calc_lp - last_lp
                 if lp_diff < 0:
@@ -56,7 +57,7 @@ class Soloqueue_Leaderboard(object):
                 lp_diff = f"{greenTriangleEmoji} 0"
             name_string += f"{emojiMap[tier]} {name}\n"
             rank_string += f"{tier} {rank} {lp} LP\n"     
-            num_string += f"{self.num_ranked_past_week(name)} ({lp_diff} LP)\n"
+            num_string += f"{num_ranked} ({lp_diff} LP)\n"
 
             i += 1
             if i % 10 == 0:
@@ -85,10 +86,13 @@ class Soloqueue_Leaderboard(object):
         names = await self.db_handler.get_names()
         for summoner in names:
             try:
-                response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner[0]) 
-                id = response["id"]
-                name = response["name"]
-                rank = inhouse.global_objects.watcher.league.by_summoner(self.my_region,id)
+                puuid = summoner[3]
+                id = summoner[4]
+                name = summoner[0]
+                if puuid == None or id == None:
+                    raise Exception(name + " doesn't have puuid")
+                rank, num_ranked = self.api_calls(id,puuid)
+                time.sleep(0.1)
                 playerRank = ""
                 lp = 0
                 last_lp = summoner[2]
@@ -105,7 +109,7 @@ class Soloqueue_Leaderboard(object):
                     playerRank == "UNRANKED"
                     tier = "UNRANKED"
                     lp = 0
-                self.add_player(name,tier,playerRank,lp,last_lp)
+                self.add_player(name,tier,playerRank,lp,last_lp,num_ranked)
                 # if weekday is 0 (monday) and the hour of now is 8 (8am) reset the weeks LP
                 if datetime.now().weekday() == 0 and datetime.now().hour == 8:
                     await self.db_handler.set_week_lp(summoner[1],self.calc_lp(tier=tier,div=playerRank,lp=lp))
@@ -118,10 +122,8 @@ class Soloqueue_Leaderboard(object):
             await self.channel.send(embed=msg)
         await self.channel.send(view=JoinButtons(self.db_handler))
 
-    def num_ranked_past_week(self, name: str):
+    def num_ranked_past_week(self, puuid):
         try:
-            response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,summoner_name=name) 
-            puuid = response['puuid']
             # subtract number of seconds in a week to get a week ago epoch time
             week_ago = int(time.time() - inhouse.constants.seconds_in_week)
             #queue type 420 is "solo queue" according to riot API documentation (lol)
@@ -130,6 +132,21 @@ class Soloqueue_Leaderboard(object):
         except Exception as e:
                 print(e)
 
+    # rate limits are 20 every second and 100 every 2 min, since we are calling API twice its 10 every second and 100 every 2 minutes
+    @limits(calls=10, period=1)
+    @limits(calls=100, period=inhouse.constants.seconds_in_two_min)
+    @sleep_and_retry
+    def api_calls(self, sum_id, puuid):
+        try:
+            rank = inhouse.global_objects.watcher.league.by_summoner(self.my_region,sum_id)
+            # subtract number of seconds in a week to get a week ago epoch time
+            week_ago = int(time.time() - inhouse.constants.seconds_in_week)
+            #queue type 420 is "solo queue" according to riot API documentation (lol)
+            response = inhouse.global_objects.watcher.match.matchlist_by_puuid(self.my_region,puuid=puuid,start_time=week_ago,queue=420,count=100)
+            return rank, len(response)
+        except Exception as e:
+                print(e)
+        
     def calc_lp(self,tier,div,lp):
         if tier == "UNRANKED":
             return 0
@@ -143,8 +160,16 @@ class JoinButtons(discord.ui.View): # Create a class called MyView that subclass
     @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
     async def show_rank(self, button, interaction):
         print("Add to DB")
-        await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name,True)
-        await interaction.response.send_message("Added. You will now show up on next leaderboard reset.", ephemeral=True)
+        try:
+            response = inhouse.global_objects.watcher.summoner.by_name(self.my_region,interaction.user.display_name)
+            id = response["id"]
+            puuid = response['puuid']
+            await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name, True, id, puuid)
+            await interaction.response.send_message("Added. You will now show up on next leaderboard reset.", ephemeral=True)
+        except Exception as e:
+            print(e)
+            await interaction.response.send_message("Your display name isn't an IGN. Please update your nickname or connect Staff", ephemeral=True)
+
 
     @discord.ui.button(label="Hide Rank", style=discord.ButtonStyle.red)
     async def not_show_rank(self, button, interaction):

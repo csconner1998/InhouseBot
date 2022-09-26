@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import re
 import os
 from inhouse.command_handlers.causal_modes import CasualModePicker, active_players_set
 from inhouse.command_handlers.coin_manager import CoinManager
@@ -317,6 +316,24 @@ async def match_history(ctx, count: int):
 async def force_show_rank(ctx, name: str, discord_id: str, opt: bool):
     await db_handler.set_show_rank(discord_id,name,opt)
     await ctx.respond("Updated")
+
+# Used to backfill the players who already used /show_rank and neeed PUUID
+@commands.has_role("Staff")
+@bot.slash_command(description="Staff only. Force Opt in or out of soloqueue leaderboard")
+async def fix_puuid(ctx):
+    missing = await db_handler.get_missing_names()
+    await ctx.respond("Updating")
+    for i in missing:
+        try:
+            response = inhouse.global_objects.watcher.summoner.by_name(my_region,i[1])
+            id = response["id"]
+            puuid = response["puuid"]
+            await db_handler.update_sum_ids(i[0],sum_id=id,puuid=puuid)
+            # Delete where puuid is null
+            await db_handler.delete_missing_puuid()
+        except Exception as e:
+            print(e)
+    await ctx.send("Updated")
 
 # Set players nickname with Summoner Name
 @bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
