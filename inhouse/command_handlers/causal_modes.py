@@ -134,7 +134,7 @@ class CasualLobby(object):
             embed_msg.add_field(name="Games Played", value=game_count, inline=True)
             embed_msg.add_field(name="Wonkoin Earned", value=game_count * inhouse.constants.coins_for_casual_game, inline=True)
 
-            member = self.thread.guild.get_member_named(name=player)
+            member = self.thread.guild.get_member_named(player)
             if not member == None: 
                 inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=game_count * inhouse.constants.coins_for_casual_game)
             else:
@@ -163,7 +163,7 @@ class CasualModePicker(discord.ui.View):
             await inhouse.global_objects.casual_queue.queue_message.reply("Queue is already open! React to the above message")
             return
         inhouse.global_objects.casual_queue = Queue(ctx=self.ctx)
-        await inhouse.global_objects.casual_queue.create_queue_message(inhouse.constants.server_roles.casual_inhouse)
+        await inhouse.global_objects.casual_queue.create_queue_message(inhouse.global_objects.server_roles.casual_inhouse)
         
     @discord.ui.button(label="Casual Inhouse - ARAM", style=discord.ButtonStyle.primary, emoji=f"<:ARAM:{inhouse.constants.aram_emoji_id}>")
     async def normal_game_callback(self, button, interaction):
@@ -173,7 +173,7 @@ class CasualModePicker(discord.ui.View):
             await inhouse.global_objects.casual_queue_aram.queue_message.reply("Queue is already open! React to the above message")
             return
         inhouse.global_objects.casual_queue_aram = AramQueue(ctx=self.ctx)
-        await inhouse.global_objects.casual_queue_aram.create_queue_message(inhouse.constants.server_roles.casual_inhouse)
+        await inhouse.global_objects.casual_queue_aram.create_queue_message(inhouse.global_objects.server_roles.casual_inhouse)
 
     @discord.ui.button(label="ARAM", style=discord.ButtonStyle.primary, emoji=f"<:ARAM:{inhouse.constants.aram_emoji_id}>")
     async def aram_callback(self, button, interaction):

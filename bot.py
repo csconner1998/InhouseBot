@@ -57,6 +57,16 @@ my_region = 'na1'
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
+# Global error handler
+@bot.event
+async def on_application_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.respond("This command is currently on cooldown!", ephemeral=True)
+    else:
+        await ctx.respond("Something went wrong! Please try again in a few minutes. If the problem persists, reach out to Staff.", ephemeral=True)
+        # TODO: should critical log this instead of just swallowing.
+        print(error) 
+
 # Ping
 @bot.slash_command(description="Health check. Responds with 'pong'.")
 async def ping(ctx):
@@ -226,9 +236,8 @@ async def refresh_leaderboard(ctx):
 async def add_to_db(ctx, user: discord.Member):
     try: 
         cur = db_handler.get_cursor()
-        insert_cmd = f"INSERT INTO players({inhouse.constants.new_player_db_key}) VALUES ('{user.id}', '{user.name}', '0', '0', '0', '{inhouse.constants.default_points}')"
-        cur.execute(insert_cmd)
-        db_handler.complete_transaction(cur)
+        insert_cmd = f"INSERT INTO players({inhouse.constants.new_player_db_key}) VALUES ('{user.id}', '{user.name}', '0', '0', '{inhouse.constants.default_points}')"
+        db_handler.complete_transaction(cur, [insert_cmd])
         await ctx.respond("Done.")
     except Exception as e:
         print(e)
@@ -336,10 +345,12 @@ async def fix_puuid(ctx):
     await ctx.send("Updated")
 
 # Set players nickname with Summoner Name
-@bot.slash_command(description="Sets discord nick name. Please enter valid Summoner name")
+# Cooldown is once per 5 minutes to prevent spam/overloading riot API
+@commands.cooldown(rate=1, per=300)
+@bot.slash_command(description="Sets discord nickname. Please enter valid Summoner name")
 async def setname(ctx, summoner_name: str):
-    if ctx.channel_id != inhouse.constants.name_assign_channel:
-        await ctx.author.send("Can only use /setname in #name-assign. If you need to change your name, please reach out to a Staff member")
+    if not ctx.channel_id in [inhouse.constants.name_assign_channel, inhouse.constants.bot_spam_channel]:
+        await ctx.author.send(f"Can only use /setname in <#{inhouse.constants.name_assign_channel}> or <#{inhouse.constants.bot_spam_channel}>. If you need assistance, please reach out to a Staff member")
         return
     try:
         role = discord.utils.get(ctx.guild.roles, name="Member")
@@ -361,8 +372,22 @@ async def casual(ctx: discord.ApplicationContext):
         await ctx.respond("You are already in a Lobby!")
         return
 
-    await ctx.respond("Choose the mode you'd like to play!")
+    await ctx.respond("Choose the mode you'd like to play!", ephemeral=True)
     await ctx.send("Modes:", view=CasualModePicker(timeout=30, ctx=ctx))
+
+@bot.slash_command(description=f"Send a message as a fancy embed! Costs {inhouse.constants.cost_for_embed_message} Wonkoin.")
+async def fancy(ctx: discord.ApplicationContext, message: str):
+    try:
+        if inhouse.global_objects.coin_manager.get_member_coins(ctx.author) >= inhouse.constants.cost_for_embed_message:
+            embed = discord.Embed(description=f"**{ctx.author.display_name}:** {message}", color=discord.Color.random())
+            await ctx.respond(embed=embed)
+            inhouse.global_objects.coin_manager.update_member_coins(member=ctx.author, coin_amount=-inhouse.constants.cost_for_embed_message)
+        else:
+            await ctx.respond("You don't have enough Wonkoin!", ephemeral=True)
+    except Exception as e:
+        print(e)
+        await ctx.respond("Something went wrong! Please try again in a few minutes or reach out to Staff.", ephemeral=True)
+
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
@@ -552,6 +577,6 @@ async def handle_queue_reaction(user, emoji, added_reaction: bool, queue_to_hand
             queue_to_handle.queued_players[role].remove(player_to_remove)
 
 print("Bot Starting...")
-print(inhouse.global_objects.watcher)
+print(f"Riot API Check: {inhouse.global_objects.watcher}")
 bot.run(os.environ.get('Discord_Key'))
 

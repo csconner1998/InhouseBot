@@ -14,6 +14,7 @@ aram_emoji_id = 1009563351946371102
 soulrush_bot_id = 197473689263013898
 
 name_assign_channel = 1009553154305695816
+bot_spam_channel = 1021446812177006682
 bot_dev_role = 1001367008086081547
 
 inhouse_role_assign_message = 1013201403633750086
@@ -50,10 +51,14 @@ seconds_in_week = 604800
 solo_queue_leaderboard_loop_timer = 1
 seconds_in_two_min = 120
 
-coins_for_casual_game = 50
-coins_for_competitive_inhouse_win = 300
+# MARK: Wonkoin stuff
+# TODO: really need a config file soon
+
+coins_for_casual_game = 5
+coins_for_competitive_inhouse_win = 20
 coins_for_competitive_inhouse_loss = coins_for_competitive_inhouse_win / 2
-coins_for_casual_inhouse_win = 100
+coins_for_casual_inhouse_win = 10
 coins_for_casual_inhouse_loss = coins_for_casual_inhouse_win / 2
+coins_for_soloq_leader = 100
 
-
+cost_for_embed_message = 20

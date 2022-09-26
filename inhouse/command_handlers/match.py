@@ -157,8 +157,8 @@ class ActiveMatch(object):
         who_won = discord.Embed(description="Who Won?", color=discord.Color.gold())
         won_message = await self.thread.send(embed=who_won)
         cmd = f"UPDATE active_matches SET win_msg_id = '{str(won_message.id)}' where active_id = '{str(self.match_id)}'"
-        cur.execute(cmd)
-        self.db_handler.complete_transaction(cur)
+        self.db_handler.complete_transaction(cur, [cmd])
+
         await won_message.add_reaction("🟦")
         await won_message.add_reaction("🟥")
         return won_message
@@ -173,8 +173,7 @@ class ActiveMatch(object):
         # Always remove the active match
         remove_active_cur = self.db_handler.get_cursor()
         remove_active_match_sql = f"DELETE FROM active_matches WHERE active_id = '{self.match_id}'"
-        remove_active_cur.execute(remove_active_match_sql)
-        self.db_handler.complete_transaction(remove_active_cur)
+        self.db_handler.complete_transaction(remove_active_cur, [remove_active_match_sql])
 
         # if test/non-competitive match, lets not make a trip to the DB and stop here
         if self.is_test_match:
@@ -219,9 +218,7 @@ class ActiveMatch(object):
             player_entries += f"({self.match_id}, {player.id}, False, {role_str_to_db_id[role]}),"
         match_players_sql = f"INSERT INTO matches_players(match_id, player_id, blue, role) VALUES {player_entries.strip(',')}"
 
-        cur.execute(complete_match_sql)
-        cur.execute(match_players_sql)
-        self.db_handler.complete_transaction(cur)
+        self.db_handler.complete_transaction(cur, [complete_match_sql, match_players_sql])
         await self.original_thread_message.delete()
     
     async def swap_players(self, role: str):
@@ -233,9 +230,7 @@ class ActiveMatch(object):
         # Update DB
         cur = self.db_handler.get_cursor()
         cmd = f"UPDATE active_matches SET {role}1 = {role}2, {role}2 = {role}1 WHERE active_id = {str(self.match_id)}"
-        print(cmd)
-        cur.execute(cmd)
-        self.db_handler.complete_transaction(cur)
+        self.db_handler.complete_transaction(cur, [cmd])
         await self.send_match_description()
             
     def create_active_db_entry(self):
@@ -259,10 +254,9 @@ class ActiveMatch(object):
                 cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
-        cur.execute(cmd)
         # update match id
         self.match_id = cur.fetchone()[0]
-        self.db_handler.complete_transaction(cur)
+        self.db_handler.complete_transaction(cur, [cmd])
     
     def create_missing_players(self):
         all_players = self.get_all_players()
@@ -279,9 +273,8 @@ class ActiveMatch(object):
             elif not player.id in existing_player_ids:
                 # insert missing player
                 insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '{default_points}')"
-                cur.execute(insert_cmd)
         
-        self.db_handler.complete_transaction(cursor=cur)
+        self.db_handler.complete_transaction(cursor=cur, cmds=[insert_cmd])
             
 
     # Utils

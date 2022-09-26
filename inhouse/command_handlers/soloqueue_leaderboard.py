@@ -113,14 +113,35 @@ class Soloqueue_Leaderboard(object):
                 # if weekday is 0 (monday) and the hour of now is 8 (8am) reset the weeks LP
                 if datetime.now().weekday() == 0 and datetime.now().hour == 8:
                     await self.db_handler.set_week_lp(summoner[1],self.calc_lp(tier=tier,div=playerRank,lp=lp))
+
             except Exception as e:
                 print(e)
+
         async for message in self.channel.history(limit=50):
             await message.delete()
         msgs = self.get_embbeded(emojiList)
         for msg in msgs:
             await self.channel.send(embed=msg)
         await self.channel.send(view=JoinButtons(self.db_handler))
+        await self.grant_leader_coins()
+
+    async def grant_leader_coins(self):
+        try:
+            if datetime.now().weekday() == 0 and datetime.now().hour == 8:
+                # Top 3 get coins at start of every week (100, 50, 25)
+                coins_to_grant = inhouse.constants.coins_for_soloq_leader
+                for name, _, _, _, _, _ in sorted(self.player_list, key = itemgetter(4), reverse=True)[:3]:
+                    # get memmber by ID
+                    disc_id = await self.db_handler.get_soloq_entry_by_name(name)
+                    member = self.channel.guild.get_member(disc_id)
+                    if member == None:
+                        print(f"Did not grant coins to {name}")
+                        continue
+                    inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=coins_to_grant)
+                    coins_to_grant /= 2
+        except Exception as e:
+            print(e)
+
 
     def num_ranked_past_week(self, puuid):
         try:
@@ -174,6 +195,6 @@ class JoinButtons(discord.ui.View): # Create a class called MyView that subclass
 
     @discord.ui.button(label="Hide Rank", style=discord.ButtonStyle.red)
     async def not_show_rank(self, button, interaction):
-        print("Remove from DB")
+        print("Remove from Soloq Leaderboard")
         await self.db_handler.set_show_rank(interaction.user.id,interaction.user.display_name,False)
         await interaction.response.send_message("Removed. You will no longer show up on next leaderboard reset.", ephemeral=True)
