@@ -35,12 +35,20 @@ class DatabaseHandler:
         retList = cur.fetchall()
         return retList
 
+    async def get_soloq_entry_by_name(self, name: str):
+        cur = self.get_cursor()
+        cmd = f"SELECT discord_id FROM soloqueue_leaderboard where name = {name}"
+        cur.execute(cmd)
+        id_entry = cur.fetchone()
+        return id_entry[0]
+
     async def get_missing_names(self):
         cur = self.get_cursor()
         cmd = "SELECT discord_id, league_name FROM soloqueue_leaderboard where puuid is NULL;"
         cur.execute(cmd)
         retList = cur.fetchall()
         return retList
+
     async def delete_missing_puuid(self):
         cur = self.get_cursor()
         cmd = "DELETE FROM soloqueue_leaderboard where puuid is NULL;"
