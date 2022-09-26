@@ -59,5 +59,6 @@ coins_for_competitive_inhouse_win = 20
 coins_for_competitive_inhouse_loss = coins_for_competitive_inhouse_win / 2
 coins_for_casual_inhouse_win = 10
 coins_for_casual_inhouse_loss = coins_for_casual_inhouse_win / 2
+coins_for_soloq_leader = 100
 
 cost_for_embed_message = 20

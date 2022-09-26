@@ -4,11 +4,12 @@ This is a discord bot for University of Utah League of Legends Esports. We welco
 *If you know what you're doing, feel free to skip around as much as you need.*
 
 **Cool stuff includes:**
-- A fully built Inhouse system, including a queue for joining games, automatic team assignment, W/L and point tracking, and a leaderboard
-- Integration with the Riot API for a soloqueue leaderboard (WIP) and rewards for playing games with other community members
+- A fully built Inhouse system, including a queue for joining games, automatic team assignment, W/L and point tracking, and a leaderboard!
+- Integration with the Riot API for a soloqueue leaderboard (WIP) and rewards for playing games with other community members!
+- Currency system with rewards for being active in the community, playing games, and supporting the teams!
+- Auto-updating opt-in Soloqueue leaderboard!
 
 **Coming Soon TM:**
-- Currency system with rewards for being active in the community, playing games, and supporting the teams
 - Currency betting on pro games and rewards
 ---
 ## Running the Bot
