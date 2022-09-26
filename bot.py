@@ -57,6 +57,16 @@ my_region = 'na1'
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
+# Global error handler
+@bot.event
+async def on_application_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.respond("This command is currently on cooldown!", ephemeral=True)
+    else:
+        await ctx.respond("Something went wrong! Please try again in a few minutes. If the problem persists, reach out to Staff.")
+        # TODO: should critical log this instead of just swallowing.
+        print(error) 
+
 # Ping
 @bot.slash_command(description="Health check. Responds with 'pong'.")
 async def ping(ctx):
@@ -567,6 +577,6 @@ async def handle_queue_reaction(user, emoji, added_reaction: bool, queue_to_hand
             queue_to_handle.queued_players[role].remove(player_to_remove)
 
 print("Bot Starting...")
-print(inhouse.global_objects.watcher)
+print(f"Riot API Check: {inhouse.global_objects.watcher}")
 bot.run(os.environ.get('Discord_Key'))
 
