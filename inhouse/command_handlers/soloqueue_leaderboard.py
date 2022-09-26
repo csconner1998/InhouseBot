@@ -156,6 +156,7 @@ class JoinButtons(discord.ui.View): # Create a class called MyView that subclass
     def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):
         super().__init__(timeout=None)
         self.db_handler = db_handler
+        self.my_region = "na1"
 
     @discord.ui.button(label="Show Rank", style=discord.ButtonStyle.blurple)
     async def show_rank(self, button, interaction):
