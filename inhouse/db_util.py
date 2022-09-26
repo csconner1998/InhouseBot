@@ -79,17 +79,20 @@ class DatabaseHandler:
         cmd = f"SELECT match_id, name, blue, winner FROM matches_players INNER JOIN players ON matches_players.player_id = players.id inner join matches on matches_players.match_id = matches.matchid ORDER BY matches.matchid DESC, blue ASC limit {count*10};"
         cur.execute(cmd)
         retList = cur.fetchall()
-        totalStr = "```Match History```"
+        totalStr = "```Match History``\n`"
         gameIDstr = ""
         blueString = ""
         redString = ""
+        print(retList)
         for i in range(len(retList)):
             if i % 10 == 0:
                 if i != 0:
                     totalStr += f"{gameIDstr}\n{blueString}\n{redString}\n\n"
+                    print(totalStr)
                 gameIDstr= f"**__Game ID: {str(retList[i][0])}__**"
                 redString = "**Red** | "
                 blueString = "**Blue** | "
+
             #Is blue
             if retList[i][2]:
                 blueString += retList[i][1] + " | "
@@ -100,6 +103,7 @@ class DatabaseHandler:
                 redString += retList[i][1] + " | "
                 if i % 5 == 4 and retList[i][3] == "red":
                     redString += " :trophy:"
+
         totalStr += f"{gameIDstr}\n{blueString}\n{redString}\n\n"
         msg = discord.Embed(description=totalStr, color=discord.Color.gold())
         await ctx.send(embed=msg)
@@ -110,6 +114,10 @@ class DatabaseHandler:
         cmd = f"SELECT name, win, loss, sp FROM players WHERE id ='{str(requested_user.id)}'"
         cur.execute(cmd)
         value = cur.fetchone()
+        if value == None:
+            await ctx.user.send("Player not found (They may not have played any games). If this is incorrect, please contact a staff member.")
+            return
+
         win = value[1]
         loss = value[2]
         ratio = value[3]
@@ -122,6 +130,7 @@ class DatabaseHandler:
         msg.add_field(name="Summoner", value=nameStr, inline=True)
         msg.add_field(name="Soulrush Points", value=SPstr, inline=True)
         msg.add_field(name="W/L", value=Ratstr, inline=True)
+        
         # send standing as a DM to the requesting user
         await ctx.user.send(embed=msg)
         cur.close()

@@ -51,10 +51,13 @@ seconds_in_week = 604800
 solo_queue_leaderboard_loop_timer = 1
 seconds_in_two_min = 120
 
+# MARK: Wonkoin stuff
+# TODO: really need a config file soon
+
 coins_for_casual_game = 5
 coins_for_competitive_inhouse_win = 20
 coins_for_competitive_inhouse_loss = coins_for_competitive_inhouse_win / 2
 coins_for_casual_inhouse_win = 10
 coins_for_casual_inhouse_loss = coins_for_casual_inhouse_win / 2
 
-
+cost_for_embed_message = 20
