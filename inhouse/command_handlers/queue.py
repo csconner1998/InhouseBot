@@ -217,3 +217,8 @@ class AramQueue(Queue):
 
     def all_queued_player_ids(self) -> list:
         return [player.id for player in self.queued_players["all"]]
+
+class QueueJoin(discord.ui.View):
+    def __init__(self, queue: Queue):
+        super().__init__(timeout=None)
+        self.queue = queue

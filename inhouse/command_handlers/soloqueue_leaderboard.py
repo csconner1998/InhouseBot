@@ -3,8 +3,6 @@ from discord.utils import get
 from discord.ext import tasks
 from operator import itemgetter
 
-from importlib_metadata import SelectableGroups
-from sqlalchemy import true
 import inhouse.constants
 import inhouse.global_objects
 import time
@@ -128,10 +126,11 @@ class Soloqueue_Leaderboard(object):
         for msg in msgs:
             await self.channel.send(embed=msg)
         await self.channel.send(view=JoinButtons(self.db_handler))
-        await self.grant_leader_coins()
+        await self.grant_coins()
 
-    async def grant_leader_coins(self, ordered_most_improved: list):
+    async def grant_coins(self):
         try:
+            # only do coin days on weekly refreshes
             if datetime.now().weekday() == 0 and datetime.now().hour == 8:
                 # Top 3 get coins at start of every week (100, 50, 25)
                 coins_to_grant = inhouse.constants.coins_for_soloq_leader
@@ -145,15 +144,23 @@ class Soloqueue_Leaderboard(object):
                     inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=coins_to_grant)
                     coins_to_grant /= 2
 
-                # Top 3 gains also get the same amount of coints
+                # Everyone gets 1 wonkoin per 10 LP gain
                 lp_diffs = []
                 for name, _, _, _, calc_lp, last_lp, _ in self.player_list:
                     lp_diff = calc_lp - last_lp
                     lp_diffs.append((name, lp_diff))
+
+                    if lp_diff > 0:
+                        disc_id = await self.db_handler.get_soloq_entry_by_name(name)
+                        member = self.channel.guild.get_member(disc_id)
+                        if member == None:
+                            print(f"Did not grant coins to {name} for LP gains")
+                            continue
+                        inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=int(lp_diff / 10))
                 
+                # Sort for top 3 highest diffs, they also get 100/50/25
                 coins_to_grant = inhouse.constants.coins_for_soloq_leader
-                # sort for top 3 highest diffs
-                for name, diff in sorted(lp_diffs, key=itemgetter(1), reverse=true)[:3]:
+                for name, diff in sorted(lp_diffs, key=itemgetter(1), reverse=True)[:3]:
                     # get memmber by ID
                     disc_id = await self.db_handler.get_soloq_entry_by_name(name)
                     member = self.channel.guild.get_member(disc_id)
