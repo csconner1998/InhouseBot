@@ -265,6 +265,7 @@ class ActiveMatch(object):
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
         existing_player_ids = [existing_player[0] for existing_player in cur.fetchall()]
+        cmd_list = []
 
         for player in all_players:
             # Check if player is a Test player (aka has id of -1) lets not create a DB record for them
@@ -273,8 +274,9 @@ class ActiveMatch(object):
             elif not player.id in existing_player_ids:
                 # insert missing player
                 insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '{default_points}')"
+                cmd_list.append(insert_cmd)
         
-        self.db_handler.complete_transaction(cursor=cur, cmds=[insert_cmd])
+        self.db_handler.complete_transaction(cursor=cur, cmds=cmd_list)
             
 
     # Utils
