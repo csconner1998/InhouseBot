@@ -246,8 +246,8 @@ class ActiveMatch(object):
             for key in roles:
                 player_ids_str += f"'{str(self.blue_team[key].id)}','{str(self.red_team[key].id)}',"
 
-                # strip last comma and insert
-                cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
+            # strip last comma and insert
+            cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
         cur.execute(cmd)
