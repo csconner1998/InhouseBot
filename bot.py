@@ -48,9 +48,6 @@ bot = discord.Bot(debug_guilds=[test_guild_id])
 bot.intents.reactions = True
 bot.intents.members = True
 
-main_leaderboard: Leaderboard = None
-solo_queue_leaderboard: Leaderboard = None
-
 my_region = 'na1'
 
 @bot.event
@@ -131,7 +128,7 @@ async def test_match(ctx):
         await ctx.respond("Queue has not been started, nothing to test.")
         return
     res = await ctx.respond("Starting test match...")
-    await inhouse.global_objects.main_queue.force_start(bot=bot)
+    await inhouse.global_objects.main_queue.force_start()
     await res.delete_original_message()
 
 # Reset Queue
@@ -149,19 +146,20 @@ async def reset_queue(ctx):
 # Stop Queue
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Completely stops the given queue.")
-async def stop_queue(ctx, main_or_casual: str):
-    if main_or_casual.lower() not in ["main", "casual"]:
-        await ctx.respond("Send as either 'main' or 'casual'")
+async def stop_queue(ctx, type: str):
+    if type.lower() not in ["main", "casual", "aram"]:
+        await ctx.respond("Send as either 'main', 'casual', or `aram`")
         return
 
-    res = await ctx.respond(f"Stopping {main_or_casual} Queue...")
-    if main_or_casual.lower() == "main" and inhouse.global_objects.main_queue != None:
+    res = await ctx.respond(f"Stopping {type} Queue...")
+    if type.lower() == "main" and inhouse.global_objects.main_queue != None:
         await inhouse.global_objects.main_queue.stop_queue()
         inhouse.global_objects.main_queue = None
-    elif main_or_casual.lower() == "casual" and inhouse.global_objects.casual_queue != None:
+    elif type.lower() == "casual" and inhouse.global_objects.casual_queue != None:
         await inhouse.global_objects.casual_queue.stop_queue()
-        await inhouse.global_objects.casual_queue_aram.stop_queue()
         inhouse.global_objects.casual_queue = None
+    elif type.lower() == "aram" and inhouse.global_objects.casual_queue_aram != None:
+        await inhouse.global_objects.casual_queue_aram.stop_queue()
         inhouse.global_objects.casual_queue_aram = None
     else:
         await ctx.send("No queue to stop")
@@ -175,20 +173,18 @@ async def set_leaderboard_channel(ctx, channel: discord.TextChannel):
     if channel == None:
         await ctx.respond("Channel not found. Send as a #channel.")
         return
-    global main_leaderboard
-    main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
+    inhouse.global_objects.main_leaderboard = Leaderboard(db_handler=db_handler, channel=channel)
     await ctx.respond("Leaderboard channel updated.")
 
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Sets the soloque leaderboard output channel.")
 async def refresh_soloque_channel(ctx: discord.ApplicationContext):
-    global solo_queue_leaderboard
-    if solo_queue_leaderboard == None:
+    if inhouse.global_objects.solo_queue_leaderboard == None:
         await ctx.respond("Channel not found. Send as a #channel.")
         return
     await ctx.respond("Refreshing leaderboard")
     emojiList = ctx.guild.emojis
-    await solo_queue_leaderboard.make(emojiList)
+    await inhouse.global_objects.solo_queue_leaderboard.make(emojiList)
 
 # Set Soloque Leaderboard Channel
 @commands.has_role("Staff")
@@ -197,15 +193,14 @@ async def set_soloque_channel(ctx: discord.ApplicationContext, channel: discord.
     if channel == None:
         await ctx.respond("Channel not found. Send as a #channel.")
         return
-    global solo_queue_leaderboard
-    if solo_queue_leaderboard != None:
-        solo_queue_leaderboard.channel = channel
+    if inhouse.global_objects.solo_queue_leaderboard != None:
+        inhouse.global_objects.solo_queue_leaderboard.channel = channel
         await ctx.respond("Soloqueue Channel reset.")
         return
-    solo_queue_leaderboard = Soloqueue_Leaderboard(db_handler=db_handler, channel=channel, region=my_region)
+    inhouse.global_objects.solo_queue_leaderboard = Soloqueue_Leaderboard(db_handler=db_handler, channel=channel, region=my_region)
     await ctx.respond("Channel and timer set for soloqueue leaderboard")
     emojiList = ctx.guild.emojis
-    solo_queue_leaderboard.make.start(emojiList)
+    inhouse.global_objects.solo_queue_leaderboard.make.start(emojiList)
 
 # Set roles
 @commands.has_role("Staff")
@@ -225,11 +220,11 @@ async def set_roles(ctx: discord.ApplicationContext,
 @commands.has_role("Staff")
 @bot.slash_command(description="Staff only command. Refreshes the leaderboard.")
 async def refresh_leaderboard(ctx):
-    if main_leaderboard == None:
+    if inhouse.global_objects.main_leaderboard == None:
         await ctx.respond("Leaderboard channel not set")
     else:
         await ctx.respond("Refreshing leaderboard...")
-        await main_leaderboard.update_leaderboard()
+        await inhouse.global_objects.main_leaderboard.update_leaderboard()
 
 @commands.has_role("Bot Dev")
 @bot.slash_command(description="Bot Dev only command.")
@@ -258,7 +253,7 @@ async def swap_players(ctx, role: str):
         return
 
     # must be sent in the thread of the individual game
-    matches_to_swap = list(filter(lambda match: match.thread.id == ctx.channel_id, [match for match in inhouse.global_objects.main_queue.active_matches_by_message_id.values()]))
+    matches_to_swap = list(filter(lambda match: match.thread.id == ctx.channel_id, [match for match in inhouse.global_objects.main_queue.active_matches]))
     if len(matches_to_swap) != 1:
         msg = discord.Embed(
             description="No active match found in this channel. Send this command in a match thread.", color=discord.Color.gold())
@@ -283,10 +278,10 @@ async def update_player_history(ctx, user: discord.Member, win_or_loss: str):
     player = Player(user_id, name=user.display_name, db_handler=db_handler)
     player.update_inhouse_standings(win_or_loss)
     await ctx.respond("Player updated.")
-    if main_leaderboard == None:
+    if inhouse.global_objects.main_leaderboard == None:
         await ctx.respond("No Leaderboard channel set currently, ask an Admin to set it")
         return
-    await main_leaderboard.update_leaderboard()
+    await inhouse.global_objects.main_leaderboard.update_leaderboard()
 
 # Add or remove coins from a member
 @commands.has_role("Staff")
@@ -400,32 +395,10 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         await handle_inhouse_role_reaction(payload=payload)
 
     # Rest of reactions are queue operations, if one isn't active, short-circuit
-    if inhouse.global_objects.main_queue == None and inhouse.global_objects.casual_queue == None and inhouse.global_objects.casual_queue_aram == None:
+    if inhouse.global_objects.casual_queue_aram == None:
         return
 
-    # TODO: clean this up a bit. Enums!
-
-    # Handle Competitive Queue reactions
-    if inhouse.global_objects.main_queue != None and payload.message_id == inhouse.global_objects.main_queue.queue_message.id:
-        # if the emoji isn't one of the role ones we should remove it
-        if payload.emoji.id not in inhouse.constants.all_role_emojis:
-            await inhouse.global_objects.main_queue.queue_message.clear_reaction(emoji=payload.emoji)
-            return
-        
-        # Otherwise handle the addition
-        await handle_queue_reaction(user=payload.member, emoji=payload.emoji, added_reaction=True, queue_to_handle=inhouse.global_objects.main_queue)
-    
-    # Handle casual queue reactions
-    if inhouse.global_objects.casual_queue != None and payload.message_id == inhouse.global_objects.casual_queue.queue_message.id:
-        # if the emoji isn't one of the role ones we should remove it
-        if payload.emoji.id not in inhouse.constants.all_role_emojis:
-            await inhouse.global_objects.casual_queue.queue_message.clear_reaction(emoji=payload.emoji)
-            return
-        
-        # Otherwise handle the addition
-        await handle_queue_reaction(user=payload.member, emoji=payload.emoji, added_reaction=True, queue_to_handle=inhouse.global_objects.casual_queue)
-
-    # Handle casual ARAM queue reactions
+    # Handle casual ARAM queue reactions (only one that doesn't use buttons)
     if inhouse.global_objects.casual_queue_aram != None and payload.message_id == inhouse.global_objects.casual_queue_aram.queue_message.id:
         # if the emoji isn't one of the role ones we should remove it
         if payload.emoji.id != inhouse.constants.aram_emoji_id:
@@ -433,26 +406,8 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             return
         
         # Otherwise handle the addition
-        await handle_queue_reaction(user=payload.member, emoji=payload.emoji, added_reaction=True, queue_to_handle=inhouse.global_objects.casual_queue_aram)
+        await handle_aram_queue_reaction(user=payload.member, emoji=payload.emoji, added_reaction=True)
 
-
-    main_queue_match = inhouse.global_objects.main_queue != None and payload.message_id in inhouse.global_objects.main_queue.active_matches_by_message_id.keys()
-    casual_queue_match = inhouse.global_objects.casual_queue != None and payload.message_id in inhouse.global_objects.casual_queue.active_matches_by_message_id.keys()
-    casual_aram_queue_match = inhouse.global_objects.casual_queue_aram != None and payload.message_id in inhouse.global_objects.casual_queue_aram.active_matches_by_message_id.keys()
-
-    # handle complete match reactions
-    if main_queue_match or casual_queue_match or casual_aram_queue_match:
-        # Make sure the rector is a match reporter for competitive queue
-        if main_queue_match and "Match Reporter" in [role.name for role in payload.member.roles]:
-            await handle_complete_match(payload, queue=inhouse.global_objects.main_queue)
-        # for casual queues, make sure it was a player actually in the game
-        elif casual_queue_match and payload.member.id in inhouse.global_objects.casual_queue.active_matches_by_message_id[payload.message_id].get_all_player_ids():
-            await handle_complete_match(payload, queue=inhouse.global_objects.casual_queue)
-        elif casual_aram_queue_match and payload.member.id in inhouse.global_objects.casual_queue_aram.active_matches_by_message_id[payload.message_id].get_all_player_ids():
-            await handle_complete_match(payload, queue=inhouse.global_objects.casual_queue_aram)
-        else:
-            print("not a match reporter")
-            await bot.get_message(payload.message_id).remove_reaction(emoji=payload.emoji, member=payload.member)
 
 # This handles the bot removing people's reactins from the queue as well
 # i.e. if someone attempts to queue up while already in a game this handles the bot removing that reaction gracefully
@@ -466,42 +421,18 @@ async def on_raw_reaction_remove(payload):
     if payload.message_id == inhouse.constants.inhouse_role_assign_message and payload.member.get_role(inhouse.global_objects.server_roles.competitive_inhouse.id) != None:
         await payload.member.remove_roles(inhouse.global_objects.server_roles.competitive_inhouse)
  
-    if inhouse.global_objects.main_queue == None and inhouse.global_objects.casual_queue == None and inhouse.global_objects.casual_queue_aram == None:
+    if inhouse.global_objects.casual_queue_aram == None:
         return
         
-    # Handle Queue reaction remove
-    main_queue_match = inhouse.global_objects.main_queue != None and payload.message_id == inhouse.global_objects.main_queue.queue_message.id
-    casual_queue_match = inhouse.global_objects.casual_queue != None and payload.message_id == inhouse.global_objects.casual_queue.queue_message.id
+    # Handle ARAM Queue reaction remove
     casual_queue_aram_match = inhouse.global_objects.casual_queue_aram != None and payload.message_id == inhouse.global_objects.casual_queue_aram.queue_message.id
-    if main_queue_match or casual_queue_match or casual_queue_aram_match:
+    if casual_queue_aram_match:
         # If a non-role/aram reaction was removed, this function is a no-op
-        if payload.emoji.id not in inhouse.global_objects.all_role_emojis + [aram_emoji_id]:
+        if payload.emoji.id != aram_emoji_id:
             return
-        
-        # Otherwise handle the removal
-        # TODO: this is also gross DRY
-        if main_queue_match:
-            await handle_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False, queue_to_handle=inhouse.global_objects.main_queue)
-        elif casual_queue_match:
-            await handle_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False, queue_to_handle=inhouse.global_objects.casual_queue)
-        elif casual_queue_aram_match:
-            await handle_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False, queue_to_handle=inhouse.global_objects.casual_queue_aram)
+        await handle_aram_queue_reaction(user=payload.user_id, emoji=payload.emoji, added_reaction=False)
 
 # MARK: Util functions
-
-async def handle_complete_match(payload, queue: Queue):
-    winner = ''
-    if payload.emoji.name == "🟦":
-        winner = 'blue'
-    elif payload.emoji.name == "🟥":
-        winner = 'red'
-    else:
-        await bot.get_message(payload.message_id).clear_reaction(emoji=payload.emoji)
-        return
-    
-    # remove reactions to prevent extras
-    await bot.get_message(payload.message_id).clear_reactions()
-    await queue.attempt_complete_match(payload.message_id, winner, main_leaderboard=main_leaderboard)
 
 async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
     try:
@@ -534,47 +465,28 @@ async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
 
 # NOTE: user can be either an int or a Member object depending on reaction add/remove (int on remove).
 # The function handles this on it's own.
-async def handle_queue_reaction(user, emoji, added_reaction: bool, queue_to_handle: Queue):
+async def handle_aram_queue_reaction(user, emoji, added_reaction: bool):
     if added_reaction:
         # stop players from reacting if they're already in a game
         # since we get a list of ids and mush em together we end up with a enested list with one elem, so just pull it out
-        match_player_ids = [match.get_all_player_ids() for match in queue_to_handle.active_matches_by_message_id.values()]
+        match_player_ids = [match.get_all_player_ids() for match in inhouse.global_objects.casual_queue_aram.active_matches]
         if len(match_player_ids) > 0 and user.id in match_player_ids[0]:
-            await queue_to_handle.queue_message.remove_reaction(emoji, member=user)
-            return
-
-        # Allow players to react to only one role.
-        if user.id in queue_to_handle.all_queued_player_ids():
-            await queue_to_handle.queue_message.remove_reaction(emoji, member=user)
+            await inhouse.global_objects.casual_queue_aram.queue_message.remove_reaction(emoji, member=user)
             return
 
     # add player to queue
-    # how I wish for switch statements in python :(
-    role = ''
-    emoji_id = emoji.id
-    if emoji_id == top_emoji_id:
-        role = role_top
-    if emoji_id == jg_emoji_id:
-        role = role_jungle
-    if emoji_id == mid_emoji_id:
-        role = role_mid
-    if emoji_id == bot_emoji_id:
-        role = role_adc
-    if emoji_id == supp_emoji_id:
-        role = role_support
-    if emoji_id == aram_emoji_id:
-        role = "all"
+    role = "all"
 
     if added_reaction:
         player = Player(user.id, name=user.display_name, db_handler=db_handler)
-        queue_to_handle.queued_players[role].append(player)
-        await queue_to_handle.attempt_create_match(bot=bot)
+        inhouse.global_objects.casual_queue_aram.queued_players[role].append(player)
+        await inhouse.global_objects.casual_queue_aram.attempt_create_match()
     else:
-        found_players = list(filter(lambda player: player.id == user, [player for player in queue_to_handle.queued_players[role]]))
+        found_players = list(filter(lambda player: player.id == user, [player for player in inhouse.global_objects.casual_queue_aram.queued_players[role]]))
         if len(found_players) == 1:
             # If no players match we can assume that the removed reaction was from the bot for a disallowed multi-role queue
             player_to_remove = found_players[0]
-            queue_to_handle.queued_players[role].remove(player_to_remove)
+            inhouse.global_objects.casual_queue_aram.queued_players[role].remove(player_to_remove)
 
 print("Bot Starting...")
 print(f"Riot API Check: {inhouse.global_objects.watcher}")

@@ -17,8 +17,7 @@ class Queue(object):
     - Players in the queue by role
     """
     def __init__(self, ctx: discord.context.ApplicationContext, competitive: bool = False) -> None:
-        # active matches should be {<message ID of match report>: Match object}
-        self.active_matches_by_message_id = {}
+        self.active_matches = []
         self.queued_players = {role_top: [], role_jungle: [], role_mid: [], role_adc: [], role_support: []}
         self.ctx = ctx
         # increments as matches are completed. Must be 1 or more to activate prio system
@@ -32,22 +31,26 @@ class Queue(object):
         """
         Should be called to create a new queue message
         """
-        msg_str = f"```QUEUE```Top: <:Top:{top_emoji_id}>\nJungle: <:jungle:{jg_emoji_id}>\nMid: <:Mid:{mid_emoji_id}>\nAdc: <:Bottom:{bot_emoji_id}>\nSupport: <:Support:{supp_emoji_id}>"
+        msg_str = f'''
+        ```QUEUE```
+        **Top:** <:Top:{top_emoji_id}>
+        **Jungle:** <:jungle:{jg_emoji_id}>
+        **Mid:** <:Mid:{mid_emoji_id}>
+        **Adc:** <:Bottom:{bot_emoji_id}>
+        **Support:** <:Support:{supp_emoji_id}>
+        '''
+
         msg = discord.Embed(description=msg_str, color=discord.Color.gold())
         
         if inhouse_role == None:
             await self.ctx.send(content="InHouse role is not set, ask an admin to set it.")
             inhouse_role = ""
 
-        message = await self.ctx.send(content=f"{inhouse_role.mention} InHouse Queue is open!", embed=msg)
-        self.queue_message = message
-
-        # can maybe asyncio.gather these but runs into some REST overlap
-        await self.queue_message.add_reaction(f"<:Top:{top_emoji_id}>")
-        await self.queue_message.add_reaction(f"<:jungle:{jg_emoji_id}>")
-        await self.queue_message.add_reaction(f"<:Mid:{mid_emoji_id}>")
-        await self.queue_message.add_reaction(f"<:Bottom:{bot_emoji_id}>")
-        await self.queue_message.add_reaction(f"<:Support:{supp_emoji_id}>")
+        open_message = await self.ctx.send(content=f"{inhouse_role.mention} InHouse Queue is open!")
+        q_message = await self.ctx.send(embed=msg)
+        buttons_message = await self.ctx.send(view=InhouseQueueJoin(queue=self))
+        self.queue_message = q_message
+        self.messages_to_clean = [open_message, q_message, buttons_message]
 
     # resets the entire queue
     async def reset_queue(self, inhouse_role):
@@ -59,7 +62,8 @@ class Queue(object):
         self.played_matches = 0
         for players in self.queued_players.values():
             del players[:]
-        await self.queue_message.delete()
+        for msg in self.messages_to_clean:        
+            await msg.delete()
         await self.create_queue_message(inhouse_role)
     
     # stops the queue.
@@ -71,25 +75,68 @@ class Queue(object):
         """
         for players in self.queued_players.values():
             del players[:]
-        await self.queue_message.delete()
+        for msg in self.messages_to_clean:        
+            await msg.delete()
 
-    async def attempt_create_match(self, bot: discord.Bot):
+    async def attempt_create_match(self):
         """
         Checks if a match can be made and does if so, otherwise returns
         """
         print("attempting to create a match...")
         print(self.queued_players)
         if all(len(queued_for_role) >= 2 for queued_for_role in self.queued_players.values()):
-            await self.create_match(bot)
+            await self.create_match()
     
-    async def force_start(self, bot: discord.Bot):
+    async def force_start(self):
         test_player = Player(-1,"Test Player",self.db_handler)
         for role, players in self.queued_players.items():
             if len(players) < 2:
                 for i in range(2 - len(players)):
                     self.queued_players[role].append(test_player)
         print(self.queued_players)
-        await self.create_match(bot, True)
+        await self.create_match(True)
+
+    async def add_player_to_queue(self, player: Player, role: str):
+        # Disallow players who are in an active match to queue
+        match_player_ids = [match.get_all_player_ids() for match in self.active_matches]
+        if len(match_player_ids) > 0 and player.id in match_player_ids[0]:
+            print(f"{player.name} already in match")
+            return
+
+        # handle player swapping roles
+        # this is a quasi-dangerous operation (modifying while looping), but it should short-circuit safely before any issue could arise
+        to_remove_from_role = ""
+        if player.id in self.all_queued_player_ids():
+            print("already queued, swapping...")
+            for existing_role, players in self.queued_players.items():
+                if player.id in [p.id for p in players]:
+                    print("found")
+                    to_remove_from_role = existing_role
+                    break
+
+            # if they clicked the same role again, just exit
+            if to_remove_from_role != role:
+                print(f"swapping {player.name} from {to_remove_from_role} to {role}")
+                found_players = list(filter(lambda existing_p: existing_p.id == player.id, [player for player in self.queued_players[to_remove_from_role]]))
+                self.queued_players[to_remove_from_role].remove(found_players[0])
+                print("removed")
+            else:
+                print("already queued as role")
+                return
+
+        self.queued_players[role].append(player)
+        await self.attempt_create_match()
+
+    async def remove_player_from_queue(self, player_id: int):
+        to_remove_from_role = ""
+        for role, existing_players in self.queued_players.items():
+            if player_id in [p.id for p in existing_players]:
+                to_remove_from_role = role
+                break
+        
+        found_players = list(filter(lambda existing_p: existing_p.id == player_id, [player for player in self.queued_players[to_remove_from_role]]))
+        self.queued_players[to_remove_from_role].remove(found_players[0])
+        print(self.queued_players)
 
     async def manual_create_match(self, playerList, is_test : bool = False):
         """
@@ -105,12 +152,12 @@ class Queue(object):
         # create and begin match
         new_match = ActiveMatch(db_handler=self.db_handler, competitive=self.is_competitive_queue)
         new_match.is_test_match = is_test
-        report_message = await new_match.begin(players=match_players, ctx=self.ctx)
+        await new_match.begin(players=match_players, ctx=self.ctx)
 
         # Add this match to the queue's tracker
-        self.active_matches_by_message_id[report_message.id] = new_match
+        self.active_matches.append(new_match)
 
-    async def create_match(self, bot: discord.Bot, is_test : bool = False):
+    async def create_match(self, is_test : bool = False):
         """
         Creates a new ActiveMatch from players in the queue. Should be triggered when an appropriate number of players is reached.
         Handles player priority as well as reaction cleanup for players selected.
@@ -136,37 +183,14 @@ class Queue(object):
         for role in roles:
             keep_players = list(filter(lambda player: player.id not in match_player_ids and player.id != -1, [player for player in self.queued_players[role]]))
             self.queued_players[role] = keep_players
-
-        # we do a get_message here to refresh the reaction cache so that we can use it to remove the correct ones
-        # This avoids us having to map back to all the Discord User objects
-        # If we are a match created by /make_match we don't have to remove from queue msg (since its null)
-        if self.queue_message != None:    
-            for reaction in bot.get_message(self.queue_message.id).reactions:
-                player_reactions = await reaction.users().flatten()
-                users_to_remove = [user for user in player_reactions if user.id in match_player_ids]
-                for user in users_to_remove:
-                    await reaction.remove(user)
             
         # create and begin match
         new_match = ActiveMatch(db_handler=self.db_handler, competitive=self.is_competitive_queue)
         new_match.is_test_match = is_test
-        report_message = await new_match.begin(players=match_players, ctx=self.ctx)
+        await new_match.begin(players=match_players, ctx=self.ctx)
 
         # Add this match to the queue's tracker
-        self.active_matches_by_message_id[report_message.id] = new_match
-    
-    async def attempt_complete_match(self, message_id, winner, main_leaderboard: Leaderboard):
-        # if this really is a complete active match, complete it & update leaderboard. Otherwise this function is a no-op
-        # clear the reactions first to stop people from multi-reacting & over-scoring
-        match_to_finish = self.active_matches_by_message_id.pop(message_id)
-        await match_to_finish.complete_match(winner)
-        self.played_matches += 1
-
-        if main_leaderboard != None and self.is_competitive_queue:
-            await main_leaderboard.update_leaderboard()
-        elif self.is_competitive_queue:
-            # only send this if it's a competitive queue, otherwise just ignore (casual games have no leaderboard)
-            await self.ctx.send("Match has been recorded but Leaderboard channel is not set, ask an Admin to set it!")
+        self.active_matches.append(new_match)
     
     # Utils
     def all_queued_player_ids(self) -> list:
@@ -192,33 +216,86 @@ class AramQueue(Queue):
         await self.queue_message.add_reaction(f"<:ARAM:{aram_emoji_id}>")
 
 
-    async def attempt_create_match(self, bot: discord.Bot):
+    async def attempt_create_match(self):
         print("attempting to create an ARAM match...")
         if len(self.queued_players["all"]) == 10:
-            await self.create_match(bot)
+            await self.create_match()
     
-    async def create_match(self, bot: discord.Bot, is_test: bool = False):
-        # If we are a match created by /make_match we don't have to remove from queue msg (since its null)
-        if self.queue_message != None:
-            # remove all the reactions and then re-add the bot's
-            await self.queue_message.clear_reaction(f"<:ARAM:{aram_emoji_id}>")
-            await self.queue_message.add_reaction(f"<:ARAM:{aram_emoji_id}>") 
-            
+    async def create_match(self, is_test: bool = False):            
         # create and begin match
         new_match = ActiveMatchARAM(db_handler=self.db_handler, competitive=False)
         new_match.is_test_match = is_test
-        report_message = await new_match.begin(players=self.queued_players, ctx=self.ctx)
+        await new_match.begin(players=self.queued_players, ctx=self.ctx)
 
         # remove  players from internal queue representation
         self.queued_players["all"].clear()
 
         # Add this match to the queue's tracker
-        self.active_matches_by_message_id[report_message.id] = new_match
+        self.active_matches.append(new_match)
 
     def all_queued_player_ids(self) -> list:
         return [player.id for player in self.queued_players["all"]]
 
-class QueueJoin(discord.ui.View):
+class InhouseQueueJoin(discord.ui.View):
     def __init__(self, queue: Queue):
         super().__init__(timeout=None)
         self.queue = queue
+    
+    async def update_queue_message(self):
+        msg_str = f'''```QUEUE```
+        **Top** <:Top:{top_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_top]])}
+        **Jungle** <:jungle:{jg_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_jungle]])}
+        **Mid** <:Mid:{mid_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_mid]])}
+        **Adc** <:Bottom:{bot_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_adc]])}
+        **Support** <:Support:{supp_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_support]])}
+        '''
+        msg = discord.Embed(description=msg_str, color=discord.Color.gold())
+        await self.queue.queue_message.edit(embed=msg)
+
+    async def add_to_queue(self, interaction: discord.Interaction, role: str):
+        try:
+            await self.queue.add_player_to_queue(Player(id=interaction.user.id, name=interaction.user.display_name, db_handler=self.queue.db_handler), role=role)
+            await interaction.response.defer()
+        except Exception as e:
+            print(e)
+            await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
+        
+        await self.update_queue_message()
+
+    
+    @discord.ui.button(label="TOP", style=discord.ButtonStyle.secondary, emoji=f"<:Top:{top_emoji_id}>")
+    async def queue_top_callback(self, button, interaction):
+        print("Queue Top")
+        await self.add_to_queue(interaction=interaction, role=role_top)
+
+    @discord.ui.button(label="JUNGLE", style=discord.ButtonStyle.secondary, emoji=f"<:Jungle:{jg_emoji_id}>")    
+    async def queue_jungle_callback(self, button, interaction):
+        print("Queue JG")
+        await self.add_to_queue(interaction=interaction, role=role_jungle)
+
+    @discord.ui.button(label="MID", style=discord.ButtonStyle.secondary, emoji=f"<:Mid:{mid_emoji_id}>")    
+    async def queue_mid_callback(self, button, interaction):
+        print("Queue Mid")
+        await self.add_to_queue(interaction=interaction, role=role_mid)
+
+    @discord.ui.button(label="BOTTOM", style=discord.ButtonStyle.secondary, emoji=f"<:Bottom:{bot_emoji_id}>")    
+    async def queue_bottom_callback(self, button, interaction):
+        print("Queue Bot")
+        await self.add_to_queue(interaction=interaction, role=role_adc)
+
+    @discord.ui.button(label="SUPPORT", style=discord.ButtonStyle.secondary, emoji=f"<:Support:{supp_emoji_id}>")    
+    async def queue_support_callback(self, button, interaction):
+        print("Queue Supp")
+        await self.add_to_queue(interaction=interaction, role=role_support)
+
+    @discord.ui.button(label="LEAVE QUEUE", style=discord.ButtonStyle.red)    
+    async def leave_queue_callback(self, button, interaction):
+        print("Leave Queue")
+        try:
+            await self.queue.remove_player_from_queue(player_id=interaction.user.id)
+            await interaction.response.send_message(f"You left the queue", ephemeral=True)
+        except Exception as e:
+            print(e)
+            await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
+
+        await self.update_queue_message()

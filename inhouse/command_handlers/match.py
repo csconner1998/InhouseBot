@@ -1,3 +1,4 @@
+from nis import match
 import random
 import discord
 from .player import Player
@@ -28,7 +29,7 @@ class ActiveMatch(object):
         self.is_competitive_match = competitive
 
     # players is dict like { top: [Player, Player], jg: [jg1, jg2]... etc}
-    async def begin(self, players: dict, ctx, madeMatch: bool = False) -> discord.Message:
+    async def begin(self, players: dict, ctx, madeMatch: bool = False):
         """
         Begins this match, setting up the thread, sending all info messages, and doing database operations
         """
@@ -44,7 +45,7 @@ class ActiveMatch(object):
         self.create_active_db_entry()
 
         # create thread
-        return await self.create_match_thread(ctx)
+        await self.create_match_thread(ctx)
 
     def choose_teams(self, all_players: dict, madeMatch: bool = False) -> dict:
         """
@@ -71,7 +72,7 @@ class ActiveMatch(object):
                 return channel_pair
         return ("","")
     
-    async def create_match_thread(self, ctx: discord.context.ApplicationContext) -> discord.Message:
+    async def create_match_thread(self, ctx: discord.context.ApplicationContext):
         """
         Helper to create a new discord thread for the match. Threads are set to auto-archive in 2 hours
 
@@ -85,7 +86,7 @@ class ActiveMatch(object):
         self.original_thread_message = start_message
         await self.send_match_description()
         await self.move_to_channels(ctx)
-        return await self.send_match_report_result()
+        await self.send_match_report_result()
 
     async def send_match_description(self):
         """
@@ -133,7 +134,7 @@ class ActiveMatch(object):
         await asyncio.sleep(move_to_channel_delay)
         blue_channel_id, red_channel_id = self.get_empty_channels(ctx)
         if blue_channel_id == "" or red_channel_id == "":
-            self.thread.send("No Inhouse Channels Open")
+            await self.thread.send("No Inhouse Channels Open")
             return
         ping_channel_string = ""
         for blue_player in self.blue_team.values():
@@ -149,19 +150,12 @@ class ActiveMatch(object):
         if ping_channel_string != "":
             await self.thread.send(ping_channel_string)
             
-    async def send_match_report_result(self) -> discord.Message:
+    async def send_match_report_result(self):
         """
         Sends the match report "report who won" message to the match thread
         """
-        cur = self.db_handler.get_cursor()
         who_won = discord.Embed(description="Who Won?", color=discord.Color.gold())
-        won_message = await self.thread.send(embed=who_won)
-        cmd = f"UPDATE active_matches SET win_msg_id = '{str(won_message.id)}' where active_id = '{str(self.match_id)}'"
-        self.db_handler.complete_transaction(cur, [cmd])
-
-        await won_message.add_reaction("🟦")
-        await won_message.add_reaction("🟥")
-        return won_message
+        self.won_message = await self.thread.send(embed=who_won, view=ReportMatchResult(match=self))
 
     async def complete_match(self, winner: str):
         """
@@ -178,6 +172,7 @@ class ActiveMatch(object):
         # if test/non-competitive match, lets not make a trip to the DB and stop here
         if self.is_test_match:
             await self.original_thread_message.delete()
+            await self.won_message.delete()
             return
 
         # Update players in db
@@ -204,6 +199,7 @@ class ActiveMatch(object):
         # if it's non-competitive, we can skip the rest of the DB stuff
         if not self.is_competitive_match:
             await self.original_thread_message.delete()
+            await self.won_message.delete()
             return
 
         # update matches in db
@@ -220,6 +216,7 @@ class ActiveMatch(object):
 
         self.db_handler.complete_transaction(cur, [complete_match_sql, match_players_sql])
         await self.original_thread_message.delete()
+        await self.won_message.delete()
     
     async def swap_players(self, role: str):
         # Update model
@@ -243,7 +240,6 @@ class ActiveMatch(object):
         player_ids_str = ""
 
         # if test/casual match, lets just make a dummy record in DB to store locally
-        # TODO: track casual matches correctly, requires some schema changes. Would like to lump that in with coin functionality
         if self.is_test_match or not self.is_competitive_match:
             cmd = f"INSERT INTO active_matches(top1) VALUES (NULL) RETURNING active_id"
         else:
@@ -254,9 +250,10 @@ class ActiveMatch(object):
                 cmd = f"INSERT INTO active_matches({all_roles_db_key}) VALUES ({player_ids_str.strip(',')}) RETURNING active_id"
 
         cur = self.db_handler.get_cursor()
+        cur.execute(cmd)
         # update match id
         self.match_id = cur.fetchone()[0]
-        self.db_handler.complete_transaction(cur, [cmd])
+        cur.close()
     
     def create_missing_players(self):
         all_players = self.get_all_players()
@@ -267,9 +264,9 @@ class ActiveMatch(object):
         existing_player_ids = [existing_player[0] for existing_player in cur.fetchall()]
 
         for player in all_players:
-            # Check if player is a Test player (aka has id of -1) lets not create a DB record for them
+            # Check if player is a Test player (aka has id of -1), in which case this is a test match and we can short-circuit
             if player.id == -1:
-                continue
+                return
             elif not player.id in existing_player_ids:
                 # insert missing player
                 insert_cmd = f"INSERT INTO players({new_player_db_key}) VALUES ('{player.id}', '{player.name}', '0', '0', '{default_points}')"
@@ -302,12 +299,12 @@ class ActiveMatchARAM(ActiveMatch):
         self.red_team = []
         self.match_id = ""
 
-    async def begin(self, players: dict, ctx, madeMatch: bool = False) -> discord.Message:
+    async def begin(self, players: dict, ctx, madeMatch: bool = False):
         teams = self.choose_teams(all_players=players, madeMatch=madeMatch)
         self.blue_team = teams['blue']
         self.red_team = teams['red']
         # we skip DB entries for aram games
-        return await self.create_match_thread(ctx)
+        await self.create_match_thread(ctx)
 
     def choose_teams(self, all_players: dict, madeMatch: bool = False) -> dict:
         players = all_players["all"]
@@ -370,14 +367,65 @@ class ActiveMatchARAM(ActiveMatch):
             await self.thread.send(ping_channel_string)
 
     async def complete_match(self, winner: str):
-        # real simple in the aram case, just send the tropy and delete the original message
+        print(f"completing ARAM match with winner {winner}")
+        # real simple in the aram case, just send the tropy, update coins, and delete messages
         msg = discord.Embed(description=f":trophy: {winner.upper()} WINS! :trophy:", color=discord.Color.gold())
+        if winner == 'blue':
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.blue_team.values()], coin_amount=coins_for_casual_inhouse_win)
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.red_team.values()], coin_amount=coins_for_casual_inhouse_loss)
+
+        if winner == 'red':
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.red_team.values()], coin_amount=coins_for_casual_inhouse_win)
+                inhouse.global_objects.coin_manager.update_all_member_coins(member_ids=[player.id for player in self.blue_team.values()], coin_amount=coins_for_casual_inhouse_loss)
+
         await self.thread.send(embed=msg)
         await self.original_thread_message.delete()
+        await self.won_message.delete()
 
-    async def send_match_report_result(self) -> discord.Message:
+    async def send_match_report_result(self):
         who_won = discord.Embed(description="Who Won?", color=discord.Color.gold())
-        won_message = await self.thread.send(embed=who_won)
-        await won_message.add_reaction("🟦")
-        await won_message.add_reaction("🟥")
-        return won_message
+        await self.thread.send(embed=who_won, view=ReportMatchResult(match=self))
+
+
+
+
+class ReportMatchResult(discord.ui.View):
+    def __init__(self, match: ActiveMatch):
+        super().__init__(timeout=None)
+        self.match = match
+    
+    async def handle_complete_match(self, interaction: discord.Interaction, winner: str):
+        try:
+            if (self.match.is_competitive_match and "Match Reporter" in [role.name for role in interaction.user.roles]) or self.match.is_test_match:
+                    # normal matches (need to have match reporter)
+                    await self.match.complete_match(winner=winner)
+                    inhouse.global_objects.main_queue.played_matches += 1
+                    inhouse.global_objects.main_queue.active_matches.remove(self.match)
+                    if inhouse.global_objects.main_leaderboard != None:
+                        await inhouse.global_objects.main_leaderboard.update_leaderboard()
+                        await interaction.response.defer()
+                    else:
+                        await interaction.response.send_message("Match has been recorded but Leaderboard channel is not set, ask Staff to set it!")
+            elif not self.match.is_competitive_match:
+                await self.match.complete_match(winner=winner)
+                if isinstance(self.match, ActiveMatchARAM):
+                    inhouse.global_objects.casual_queue_aram.active_matches.remove(self.match)
+                else:
+                    inhouse.global_objects.casual_queue.active_matches.remove(self.match)
+                await interaction.response.defer()
+            else:
+                print("unhandled match case")
+                await interaction.response.defer()
+        except Exception as e:
+            print(e)
+            await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
+
+    @discord.ui.button(label="BLUE", style=discord.ButtonStyle.blurple)    
+    async def blue_win_callback(self, button, interaction):
+        print("Blue Win")
+        await self.handle_complete_match(interaction=interaction, winner='blue')
+
+    @discord.ui.button(label="RED", style=discord.ButtonStyle.red)    
+    async def red_win_callback(self, button, interaction):
+        print("Red Win")
+        await self.handle_complete_match(interaction=interaction, winner='red')
