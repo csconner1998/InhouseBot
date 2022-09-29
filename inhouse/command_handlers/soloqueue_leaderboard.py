@@ -2,6 +2,7 @@ import discord
 from discord.utils import get
 from discord.ext import tasks
 from operator import itemgetter
+
 import inhouse.constants
 import inhouse.global_objects
 import time
@@ -23,7 +24,7 @@ class Soloqueue_Leaderboard(object):
 
     def add_player(self,name,tier,rank,lp,last_lp,num_ranked):
         calc_lp = self.calc_lp(tier,rank,lp)
-        player_obj = (name, tier, rank, lp, calc_lp,last_lp,num_ranked)
+        player_obj = (name, tier, rank, lp, calc_lp, last_lp, num_ranked)
         self.player_list.append(player_obj)
 
     def get_embbeded(self, emojiList):
@@ -46,6 +47,7 @@ class Soloqueue_Leaderboard(object):
         greenTriangleEmoji = get(emojiList, name="GreenTriangle")
         redTriangleEmoji = get(emojiList, name="RedTriangle")
         emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
+
         for name, tier, rank, lp, calc_lp, last_lp, num_ranked in sorted(self.player_list, key = itemgetter(4), reverse=True):
             if last_lp != None:
                 lp_diff = calc_lp - last_lp
@@ -53,6 +55,7 @@ class Soloqueue_Leaderboard(object):
                     lp_diff = f"{redTriangleEmoji}{(0-lp_diff)}"
                 else:
                     lp_diff = f"{greenTriangleEmoji}{lp_diff}"
+
             else:
                 lp_diff = f"{greenTriangleEmoji} 0"
             name_string += f"{emojiMap[tier]} {name}\n"
@@ -123,10 +126,11 @@ class Soloqueue_Leaderboard(object):
         for msg in msgs:
             await self.channel.send(embed=msg)
         await self.channel.send(view=JoinButtons(self.db_handler))
-        await self.grant_leader_coins()
+        await self.grant_coins()
 
-    async def grant_leader_coins(self):
+    async def grant_coins(self):
         try:
+            # only do coin days on weekly refreshes
             if datetime.now().weekday() == 0 and datetime.now().hour == 8:
                 # Top 3 get coins at start of every week (100, 50, 25)
                 coins_to_grant = inhouse.constants.coins_for_soloq_leader
@@ -135,10 +139,38 @@ class Soloqueue_Leaderboard(object):
                     disc_id = await self.db_handler.get_soloq_entry_by_name(name)
                     member = self.channel.guild.get_member(disc_id)
                     if member == None:
-                        print(f"Did not grant coins to {name}")
+                        print(f"Did not grant coins to {name} for soloqueue top position")
                         continue
                     inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=coins_to_grant)
                     coins_to_grant /= 2
+
+                # Everyone gets 1 wonkoin per 10 LP gain
+                lp_diffs = []
+                for name, _, _, _, calc_lp, last_lp, _ in self.player_list:
+                    lp_diff = calc_lp - last_lp
+                    lp_diffs.append((name, lp_diff))
+
+                    if lp_diff > 0:
+                        disc_id = await self.db_handler.get_soloq_entry_by_name(name)
+                        member = self.channel.guild.get_member(disc_id)
+                        if member == None:
+                            print(f"Did not grant coins to {name} for LP gains")
+                            continue
+                        inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=int(lp_diff / 10))
+                
+                # Sort for top 3 highest diffs, they also get 100/50/25
+                coins_to_grant = inhouse.constants.coins_for_soloq_leader
+                for name, diff in sorted(lp_diffs, key=itemgetter(1), reverse=True)[:3]:
+                    # get memmber by ID
+                    disc_id = await self.db_handler.get_soloq_entry_by_name(name)
+                    member = self.channel.guild.get_member(disc_id)
+                    if member == None:
+                        print(f"Did not grant coins to {name} for soloqueue most improved")
+                        continue
+                    inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=coins_to_grant)
+                    coins_to_grant /= 2
+                            
+
         except Exception as e:
             print(e)
 

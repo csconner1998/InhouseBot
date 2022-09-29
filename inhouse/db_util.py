@@ -37,7 +37,7 @@ class DatabaseHandler:
 
     async def get_soloq_entry_by_name(self, name: str):
         cur = self.get_cursor()
-        cmd = f"SELECT discord_id FROM soloqueue_leaderboard where name = {name}"
+        cmd = f"SELECT discord_id FROM soloqueue_leaderboard where league_name = {name}"
         cur.execute(cmd)
         id_entry = cur.fetchone()
         return id_entry[0]

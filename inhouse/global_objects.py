@@ -17,3 +17,5 @@ server_roles: RolesHolder = None
 main_queue: Queue = None
 watcher = LolWatcher(os.environ.get('Riot_Api_Key'))
 coin_manager: CoinManager = None
+main_leaderboard: Leaderboard = None
+solo_queue_leaderboard: Leaderboard = None
