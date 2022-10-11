@@ -113,7 +113,7 @@ class Soloqueue_Leaderboard(object):
                     tier = "UNRANKED"
                     lp = 0
                 self.add_player(name,tier,playerRank,lp,last_lp,num_ranked)
-                # if weekday is 0 (monday) and the hour of now is 8 (8am) reset the weeks LP
+                # if weekday is 0 (monday) and the hour of now is 8 (7am) reset the weeks LP
                 if datetime.now().weekday() == 0 and datetime.now().hour == 8:
                     await self.db_handler.set_week_lp(summoner[1],self.calc_lp(tier=tier,div=playerRank,lp=lp))
 
@@ -132,7 +132,9 @@ class Soloqueue_Leaderboard(object):
         try:
             # only do coin days on weekly refreshes
             if datetime.now().weekday() == 0 and datetime.now().hour == 8:
+                print("granting weekly coins...")
                 # Top 3 get coins at start of every week (100, 50, 25)
+                print("granting coins to top 3...")
                 coins_to_grant = inhouse.constants.coins_for_soloq_leader
                 for name, _, _, _, _, _ in sorted(self.player_list, key = itemgetter(4), reverse=True)[:3]:
                     # get memmber by ID
@@ -145,6 +147,7 @@ class Soloqueue_Leaderboard(object):
                     coins_to_grant /= 2
 
                 # Everyone gets 1 wonkoin per 10 LP gain
+                print("granting coins for everyones LP gains...")
                 lp_diffs = []
                 for name, _, _, _, calc_lp, last_lp, _ in self.player_list:
                     lp_diff = calc_lp - last_lp
@@ -159,6 +162,7 @@ class Soloqueue_Leaderboard(object):
                         inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=int(lp_diff / 10))
                 
                 # Sort for top 3 highest diffs, they also get 100/50/25
+                print("granting coins gor most improved...")
                 coins_to_grant = inhouse.constants.coins_for_soloq_leader
                 for name, diff in sorted(lp_diffs, key=itemgetter(1), reverse=True)[:3]:
                     # get memmber by ID
@@ -172,7 +176,7 @@ class Soloqueue_Leaderboard(object):
                             
 
         except Exception as e:
-            print(e)
+            print(f"Exception in leaderboard coins:\n {e}")
 
 
     def num_ranked_past_week(self, puuid):
@@ -203,7 +207,11 @@ class Soloqueue_Leaderboard(object):
     def calc_lp(self,tier,div,lp):
         if tier == "UNRANKED":
             return 0
-        return (100 * self.divMap[div]) + (400 * self.tierMap[tier]) + int(lp)
+        # master, gm, and challenger only have 1 division
+        elif tier in ["MASTER", "GRANDMASTER", "CHALLENGER"]:
+            return (400 * self.tierMap[tier]) + int(lp)
+        else:
+            return (100 * self.divMap[div]) + (400 * self.tierMap[tier]) + int(lp)
 
 class JoinButtons(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
     def __init__(self, db_handler: inhouse.db_util.DatabaseHandler):

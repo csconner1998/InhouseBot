@@ -191,6 +191,18 @@ class Queue(object):
 
         # Add this match to the queue's tracker
         self.active_matches.append(new_match)
+        await self.update_queue_message()
+    
+    async def update_queue_message(self):
+        msg_str = f'''```QUEUE```
+        **Top** <:Top:{top_emoji_id}> {','.join([player.name for player in self.queued_players[role_top]])}
+        **Jungle** <:jungle:{jg_emoji_id}> {','.join([player.name for player in self.queued_players[role_jungle]])}
+        **Mid** <:Mid:{mid_emoji_id}> {','.join([player.name for player in self.queued_players[role_mid]])}
+        **Adc** <:Bottom:{bot_emoji_id}> {','.join([player.name for player in self.queued_players[role_adc]])}
+        **Support** <:Support:{supp_emoji_id}> {','.join([player.name for player in self.queued_players[role_support]])}
+        '''
+        msg = discord.Embed(description=msg_str, color=discord.Color.gold())
+        await self.queue_message.edit(embed=msg)
     
     # Utils
     def all_queued_player_ids(self) -> list:
@@ -241,17 +253,6 @@ class InhouseQueueJoin(discord.ui.View):
         super().__init__(timeout=None)
         self.queue = queue
     
-    async def update_queue_message(self):
-        msg_str = f'''```QUEUE```
-        **Top** <:Top:{top_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_top]])}
-        **Jungle** <:jungle:{jg_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_jungle]])}
-        **Mid** <:Mid:{mid_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_mid]])}
-        **Adc** <:Bottom:{bot_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_adc]])}
-        **Support** <:Support:{supp_emoji_id}> {','.join([player.name for player in self.queue.queued_players[role_support]])}
-        '''
-        msg = discord.Embed(description=msg_str, color=discord.Color.gold())
-        await self.queue.queue_message.edit(embed=msg)
-
     async def add_to_queue(self, interaction: discord.Interaction, role: str):
         try:
             await self.queue.add_player_to_queue(Player(id=interaction.user.id, name=interaction.user.display_name, db_handler=self.queue.db_handler), role=role)
@@ -260,8 +261,7 @@ class InhouseQueueJoin(discord.ui.View):
             print(e)
             await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
         
-        await self.update_queue_message()
-
+        await self.queue.update_queue_message()
     
     @discord.ui.button(label="TOP", style=discord.ButtonStyle.secondary, emoji=f"<:Top:{top_emoji_id}>")
     async def queue_top_callback(self, button, interaction):
@@ -298,4 +298,4 @@ class InhouseQueueJoin(discord.ui.View):
             print(e)
             await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
 
-        await self.update_queue_message()
+        await self.queue.update_queue_message()
