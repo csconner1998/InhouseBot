@@ -195,11 +195,11 @@ class Queue(object):
     
     async def update_queue_message(self):
         msg_str = f'''```QUEUE```
-        **Top** <:Top:{top_emoji_id}> {','.join([player.name for player in self.queued_players[role_top]])}
-        **Jungle** <:jungle:{jg_emoji_id}> {','.join([player.name for player in self.queued_players[role_jungle]])}
-        **Mid** <:Mid:{mid_emoji_id}> {','.join([player.name for player in self.queued_players[role_mid]])}
-        **Adc** <:Bottom:{bot_emoji_id}> {','.join([player.name for player in self.queued_players[role_adc]])}
-        **Support** <:Support:{supp_emoji_id}> {','.join([player.name for player in self.queued_players[role_support]])}
+        **Top** <:Top:{top_emoji_id}> {', '.join([player.name for player in self.queued_players[role_top]])}
+        **Jungle** <:jungle:{jg_emoji_id}> {', '.join([player.name for player in self.queued_players[role_jungle]])}
+        **Mid** <:Mid:{mid_emoji_id}> {', '.join([player.name for player in self.queued_players[role_mid]])}
+        **Adc** <:Bottom:{bot_emoji_id}> {', '.join([player.name for player in self.queued_players[role_adc]])}
+        **Support** <:Support:{supp_emoji_id}> {', '.join([player.name for player in self.queued_players[role_support]])}
         '''
         msg = discord.Embed(description=msg_str, color=discord.Color.gold())
         await self.queue_message.edit(embed=msg)
@@ -256,7 +256,7 @@ class InhouseQueueJoin(discord.ui.View):
     async def add_to_queue(self, interaction: discord.Interaction, role: str):
         try:
             await self.queue.add_player_to_queue(Player(id=interaction.user.id, name=interaction.user.display_name, db_handler=self.queue.db_handler), role=role)
-            await interaction.response.defer()
+            await interaction.response.send_message(f"Joined the queue as {role}", ephemeral=True)
         except Exception as e:
             print(e)
             await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
