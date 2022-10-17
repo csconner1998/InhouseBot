@@ -136,7 +136,7 @@ class Soloqueue_Leaderboard(object):
                 # Top 3 get coins at start of every week (100, 50, 25)
                 print("granting coins to top 3...")
                 coins_to_grant = inhouse.constants.coins_for_soloq_leader
-                for name, _, _, _, _, _ in sorted(self.player_list, key = itemgetter(4), reverse=True)[:3]:
+                for name, _, _, _, _, _, _ in sorted(self.player_list, key = itemgetter(4), reverse=True)[:3]:
                     # get memmber by ID
                     disc_id = await self.db_handler.get_soloq_entry_by_name(name)
                     member = self.channel.guild.get_member(disc_id)
