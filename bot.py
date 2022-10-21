@@ -290,6 +290,16 @@ async def update_member_coins(ctx, member: discord.Member, update_amount: int):
     inhouse.global_objects.coin_manager.update_member_coins(member=member, coin_amount=update_amount)
     await ctx.respond("Coins updated")
 
+@commands.has_role("Staff")
+@bot.slash_command(description="Set casual game modes channel")
+async def casual(ctx: discord.ApplicationContext, channel: discord.TextChannel):
+    if channel == None:
+        await ctx.respond("Channel not found. Send as a #channel.")
+        return
+    await channel.send("Choose the mode you'd like to play!")
+    await channel.send("Modes:", view=CasualModePicker(timeout=None, ctx=ctx))
+    await ctx.respond("Casual channel set.")
+
 @bot.slash_command(description="Check your Wonkoin balance.")
 async def balance(ctx: discord.ApplicationContext):
     coin_balance = inhouse.global_objects.coin_manager.get_member_coins(member=ctx.author)
@@ -360,15 +370,6 @@ async def setname(ctx, summoner_name: str):
             await ctx.respond(f"<@&{inhouse.constants.bot_dev_role}> needs to update riot API key. Please reachout to Staff to fix.")
             return
         await ctx.respond(summoner_name + " is not a summoner name")
-
-@bot.slash_command(description="casual game modes")
-async def casual(ctx: discord.ApplicationContext):
-    if ctx.author.display_name in active_players_set:
-        await ctx.respond("You are already in a Lobby!")
-        return
-
-    await ctx.respond("Choose the mode you'd like to play!", ephemeral=True)
-    await ctx.send("Modes:", view=CasualModePicker(timeout=30, ctx=ctx))
 
 @bot.slash_command(description=f"Send a message as a fancy embed! Costs {inhouse.constants.cost_for_embed_message} Wonkoin.")
 async def fancy(ctx: discord.ApplicationContext, message: str):

@@ -157,27 +157,26 @@ class CasualModePicker(discord.ui.View):
 
     @discord.ui.button(label="Casual Inhouse - SR", style=discord.ButtonStyle.primary, emoji="⚔️")
     async def casual_inhouse_callback(self, button, interaction):
-        await self.disable_buttons(interaction)
         print("Chose Casual Inhouses SR")
         if inhouse.global_objects.casual_queue != None:
             await inhouse.global_objects.casual_queue.queue_message.reply("Queue is already open! React to the above message")
             return
         inhouse.global_objects.casual_queue = Queue(ctx=self.ctx)
         await inhouse.global_objects.casual_queue.create_queue_message(inhouse.global_objects.server_roles.casual_inhouse)
+        await self.respond_to_press(interaction)
         
     @discord.ui.button(label="Casual Inhouse - ARAM", style=discord.ButtonStyle.primary, emoji=f"<:ARAM:{inhouse.constants.aram_emoji_id}>")
     async def normal_game_callback(self, button, interaction):
-        await self.disable_buttons(interaction)
         print("Chose Casual Inhouses ARAM")
         if inhouse.global_objects.casual_queue_aram != None:
             await inhouse.global_objects.casual_queue_aram.queue_message.reply("Queue is already open! React to the above message")
             return
         inhouse.global_objects.casual_queue_aram = AramQueue(ctx=self.ctx)
         await inhouse.global_objects.casual_queue_aram.create_queue_message(inhouse.global_objects.server_roles.casual_inhouse)
+        await self.respond_to_press(interaction)
 
     @discord.ui.button(label="ARAM", style=discord.ButtonStyle.primary, emoji=f"<:ARAM:{inhouse.constants.aram_emoji_id}>")
     async def aram_callback(self, button, interaction):
-        await self.disable_buttons(interaction)
         print("Chose ARAM")
         if interaction.user.display_name in active_players_set:
             await interaction.response.send_message("You are already in a lobby!")
@@ -187,10 +186,10 @@ class CasualModePicker(discord.ui.View):
         message = await interaction.channel.send(f"{inhouse.global_objects.server_roles.aram.mention}", embed=msg)
         new_lobby = CasualLobby(initiator_name=interaction.user.display_name, game_type='ARAM')
         await new_lobby.create_thread(message)
+        await self.respond_to_press(interaction)
 
     @discord.ui.button(label="FLEX", style=discord.ButtonStyle.primary, emoji="💪")
     async def flex_callback(self, button, interaction):
-        await self.disable_buttons(interaction)
         print("Chose Flex")
         if interaction.user.display_name in active_players_set:
             await interaction.response.send_message("You are already in a lobby!")
@@ -201,10 +200,10 @@ class CasualModePicker(discord.ui.View):
         message = await interaction.channel.send(f"{inhouse.global_objects.server_roles.flex.mention}", embed=msg)
         new_lobby = CasualLobby(initiator_name=interaction.user.display_name, game_type='Flex')
         await new_lobby.create_thread(message)
+        await self.respond_to_press(interaction)
 
     @discord.ui.button(label="NORMAL GAMES", style=discord.ButtonStyle.primary, emoji="🎮")
     async def normals_callback(self, button, interaction):
-        await self.disable_buttons(interaction)
         print("Chose Norms")
         if interaction.user.display_name in active_players_set:
             await interaction.response.send_message("You are already in a lobby!")
@@ -215,11 +214,10 @@ class CasualModePicker(discord.ui.View):
         message = await interaction.channel.send(f"{inhouse.global_objects.server_roles.normals.mention}", embed=msg)
         new_lobby = CasualLobby(initiator_name=interaction.user.display_name, game_type='Normal')
         await new_lobby.create_thread(message)
+        await self.respond_to_press(interaction)
 
-    async def disable_buttons(self, interaction):
-        for child in self.children:
-            child.disabled = True
-        await interaction.response.edit_message(view=self)  
+    async def respond_to_press(self, interaction):
+        await interaction.response.send_message("Mode selected", ephemeral=True)
 
 class CasualLobbyInteractor(discord.ui.View):
     def __init__(self, lobby):
