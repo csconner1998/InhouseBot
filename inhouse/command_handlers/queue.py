@@ -184,6 +184,8 @@ class Queue(object):
             keep_players = list(filter(lambda player: player.id not in match_player_ids and player.id != -1, [player for player in self.queued_players[role]]))
             self.queued_players[role] = keep_players
             
+        await self.update_queue_message()
+
         # create and begin match
         new_match = ActiveMatch(db_handler=self.db_handler, competitive=self.is_competitive_queue)
         new_match.is_test_match = is_test
@@ -191,7 +193,6 @@ class Queue(object):
 
         # Add this match to the queue's tracker
         self.active_matches.append(new_match)
-        await self.update_queue_message()
     
     async def update_queue_message(self):
         msg_str = f'''```QUEUE```
@@ -255,8 +256,8 @@ class InhouseQueueJoin(discord.ui.View):
     
     async def add_to_queue(self, interaction: discord.Interaction, role: str):
         try:
-            await self.queue.add_player_to_queue(Player(id=interaction.user.id, name=interaction.user.display_name, db_handler=self.queue.db_handler), role=role)
             await interaction.response.send_message(f"Joined the queue as {role}", ephemeral=True)
+            await self.queue.add_player_to_queue(Player(id=interaction.user.id, name=interaction.user.display_name, db_handler=self.queue.db_handler), role=role)
         except Exception as e:
             print(e)
             await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)

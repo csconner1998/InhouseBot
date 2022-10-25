@@ -389,8 +389,6 @@ class ActiveMatchARAM(ActiveMatch):
         await self.thread.send(embed=who_won, view=ReportMatchResult(match=self))
 
 
-
-
 class ReportMatchResult(discord.ui.View):
     def __init__(self, match: ActiveMatch):
         super().__init__(timeout=None)
@@ -405,7 +403,7 @@ class ReportMatchResult(discord.ui.View):
                     inhouse.global_objects.main_queue.active_matches.remove(self.match)
                     if inhouse.global_objects.main_leaderboard != None:
                         await inhouse.global_objects.main_leaderboard.update_leaderboard()
-                        await interaction.response.defer()
+                        await interaction.response.send_message(f"Match recorded.", ephemeral=True)
                     else:
                         await interaction.response.send_message("Match has been recorded but Leaderboard channel is not set, ask Staff to set it!")
             elif not self.match.is_competitive_match:
@@ -414,10 +412,10 @@ class ReportMatchResult(discord.ui.View):
                     inhouse.global_objects.casual_queue_aram.active_matches.remove(self.match)
                 else:
                     inhouse.global_objects.casual_queue.active_matches.remove(self.match)
-                await interaction.response.defer()
+                await interaction.response.send_message(f"Match completed.", ephemeral=True)
             else:
                 print("unhandled match case")
-                await interaction.response.defer()
+                await interaction.response.send_message("Unknown match completion attempted. Please reach out to staff.")
         except Exception as e:
             print(e)
             await interaction.response.send_message("Something went wrong! Please try again. If the issue persists, reach out to Staff.", ephemeral=True)
