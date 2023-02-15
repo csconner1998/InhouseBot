@@ -55,11 +55,8 @@ class Leaderboard(object):
             new_msgs_to_send.append(msg)
 
         # clear previous messages in channel if this is a new leaderboard instance
-        if self.current_leaderboard_messages == []:
-            async for message in self.channel.history(limit=50):
-                await message.delete()
-        else:
-            await self.channel.delete_messages(self.current_leaderboard_messages)
+        if self.channel:
+            await self.channel.purge()
         sent_messages = []
         for message in new_msgs_to_send:
             sentMsg = await self.channel.send(embed=message)
