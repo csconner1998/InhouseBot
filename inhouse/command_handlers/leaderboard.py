@@ -36,7 +36,7 @@ class Leaderboard(object):
             SP = player[4]
             name = player[1]
 
-            player_names += f"{str(idx+1)}. {name}\n"
+            player_names += f"{name}\n"
             player_points += f"** {str(SP)} SP** \n"
             player_winlosses += f"{str(win)}/{str(loss)} - {str(ratio)}%\n"
 
