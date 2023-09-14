@@ -48,7 +48,7 @@ move_to_channel_delay = 30
 # 6 hours in seconds
 casual_game_timeout = 21600
 seconds_in_week = 604800
-solo_queue_leaderboard_loop_timer = 1
+solo_queue_leaderboard_loop_timer = 12
 seconds_in_two_min = 120
 
 # MARK: Wonkoin stuff

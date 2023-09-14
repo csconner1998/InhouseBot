@@ -120,8 +120,7 @@ class Soloqueue_Leaderboard(object):
             except Exception as e:
                 print(e)
 
-        async for message in self.channel.history(limit=50):
-            await message.delete()
+        await self.channel.purge()
         msgs = self.get_embbeded(emojiList)
         for msg in msgs:
             await self.channel.send(embed=msg)
