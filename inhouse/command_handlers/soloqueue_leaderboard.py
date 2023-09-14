@@ -16,7 +16,7 @@ class Soloqueue_Leaderboard(object):
         self.channel = channel
         self.db_handler = db_handler
         self.my_region = region
-        self.tierMap = {"IRON" : 0, "BRONZE" : 1, "SILVER" : 2, "GOLD" : 3, "PLATINUM" : 4, "DIAMOND" : 5, "MASTER" : 6, "GRANDMASTER" : 6, "CHALLENGER" : 6}
+        self.tierMap = {"IRON" : 0, "BRONZE" : 1, "SILVER" : 2, "GOLD" : 3, "PLATINUM" : 4, "EMERALD": 5, "DIAMOND" : 6, "MASTER" : 7, "GRANDMASTER" : 8, "CHALLENGER" : 9}
         self.divMap = {"IV" : 0, "III" : 1, "II": 2, "I" : 3}
     
     def clearDict(self):
@@ -38,6 +38,7 @@ class Soloqueue_Leaderboard(object):
         grandmasterEmoji = get(emojiList, name="Grandmaster")
         masterEmoji = get(emojiList, name="Master")
         diamondEmoji = get(emojiList, name="Diamond")
+        emeraldEmoji = get(emojiList, name="Emerald")
         platinumEmoji = get(emojiList, name="Platinum")
         goldEmoji = get(emojiList, name="Gold")
         silverEmoji = get(emojiList, name="Silver")
@@ -46,7 +47,7 @@ class Soloqueue_Leaderboard(object):
         unratedEmoji = get(emojiList, name="Unranked")
         greenTriangleEmoji = get(emojiList, name="GreenTriangle")
         redTriangleEmoji = get(emojiList, name="RedTriangle")
-        emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
+        emojiMap = {"UNRANKED" : unratedEmoji, "IRON" : ironEmoji, "BRONZE" : bronzeEmoji, "SILVER" : silverEmoji, "GOLD" : goldEmoji, "PLATINUM" : platinumEmoji, "EMERALD" : emeraldEmoji, "DIAMOND" : diamondEmoji, "MASTER" : masterEmoji, "GRANDMASTER" : grandmasterEmoji, "CHALLENGER" : challengerEmoji}
 
         for name, tier, rank, lp, calc_lp, last_lp, num_ranked in sorted(self.player_list, key = itemgetter(4), reverse=True):
             if last_lp != None:
