@@ -448,7 +448,7 @@ async def handle_inhouse_role_reaction(payload: discord.RawReactionActionEvent):
                 tiers.append(league['tier'])
 
         for tier in tiers:
-            if tier in ['PLATINUM', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER']:
+            if tier in ['PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER']:
                 await payload.member.add_roles(inhouse.global_objects.server_roles.competitive_inhouse)
                 return
 
